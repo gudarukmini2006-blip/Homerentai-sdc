@@ -9,6 +9,10 @@ from bson import ObjectId
 import time
 import re
 
+import razorpay
+import hmac
+import hashlib
+
 # Automatically load variables from .env file if it exists
 def load_env_file():
     env_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
@@ -24,6 +28,9 @@ def load_env_file():
                         os.environ[key] = val
 
 load_env_file()
+RAZORPAY_KEY_ID = os.getenv('RAZORPAY_KEY_ID', '')
+RAZORPAY_KEY_SECRET = os.getenv('RAZORPAY_KEY_SECRET', '')
+razorpay_client = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET)) if RAZORPAY_KEY_ID else None
 
 app = Flask(__name__, static_folder='.')
 PORT = int(os.getenv('PORT', 5000))
@@ -710,6 +717,128 @@ def bulk_appliances():
             db.appliances.update_one({'id': a['id']}, {'$set': update_data}, upsert=True)
     return jsonify({"success": True})
 
+
+# ─────────────────────────────────────────────
+# PAYMENT GATEWAY (RAZORPAY)
+# ─────────────────────────────────────────────
+
+@app.route('/api/payments/create-order', methods=['POST'])
+def create_payment_order():
+    if db is None:
+        return jsonify({"error": "DB not connected"}), 500
+    if not RAZORPAY_KEY_ID or not RAZORPAY_KEY_SECRET:
+        return jsonify({"error": "Payment gateway not configured. Add RAZORPAY keys to .env"}), 500
+
+    data = request.json or {}
+    amount = data.get('amount')
+    receipt_id = data.get('receipt_id') or f"rcpt_{int(time.time())}"
+
+    try:
+        amount_paise = int(float(amount) * 100)
+    except (ValueError, TypeError):
+        return jsonify({"error": "Invalid amount"}), 400
+
+    if amount_paise < 100:
+        return jsonify({"error": "Amount must be at least ₹1"}), 400
+
+    try:
+        order = razorpay_client.order.create({
+            "amount": amount_paise,
+            "currency": "INR",
+            "receipt": receipt_id,
+            "payment_capture": 1
+        })
+    except Exception as e:
+        print("Razorpay order creation failed:", e)
+        return jsonify({"error": f"Razorpay error: {str(e)}"}), 500
+
+    # Save pending payment record
+    db.payments.insert_one({
+        'razorpay_order_id': order['id'],
+        'amount': float(amount),
+        'currency': 'INR',
+        'receipt_id': receipt_id,
+        'payment_status': 'created',
+        'payment_method': 'razorpay',
+        'user_email': (request.headers.get('X-User-Email') or '').lower(),
+        'created_at': datetime.now().isoformat()
+    })
+
+    return jsonify({
+        "order_id": order['id'],
+        "amount": order['amount'],
+        "currency": order['currency'],
+        "key_id": RAZORPAY_KEY_ID
+    })
+
+
+@app.route('/api/payments/verify', methods=['POST'])
+def verify_payment():
+    if db is None:
+        return jsonify({"error": "DB not connected"}), 500
+
+    data = request.json or {}
+    razorpay_order_id   = data.get('razorpay_order_id')
+    razorpay_payment_id = data.get('razorpay_payment_id')
+    razorpay_signature  = data.get('razorpay_signature')
+
+    if not all([razorpay_order_id, razorpay_payment_id, razorpay_signature]):
+        return jsonify({"error": "Missing payment verification fields"}), 400
+
+    msg = f"{razorpay_order_id}|{razorpay_payment_id}".encode()
+    expected = hmac.new(
+        RAZORPAY_KEY_SECRET.encode(),
+        msg,
+        hashlib.sha256
+    ).hexdigest()
+
+    if not hmac.compare_digest(expected, razorpay_signature):
+        db.payments.update_one(
+            {'razorpay_order_id': razorpay_order_id},
+            {'$set': {'payment_status': 'signature_failed'}}
+        )
+        return jsonify({"error": "Payment signature verification failed"}), 400
+
+    db.payments.update_one(
+        {'razorpay_order_id': razorpay_order_id},
+        {'$set': {
+            'razorpay_payment_id': razorpay_payment_id,
+            'razorpay_signature': razorpay_signature,
+            'payment_status': 'paid',
+            'paid_at': datetime.now().isoformat()
+        }}
+    )
+
+    return jsonify({"success": True, "payment_id": razorpay_payment_id})
+
+
+@app.route('/api/payments/webhook', methods=['POST'])
+def razorpay_webhook():
+    """Optional: catches payments even if user closes browser."""
+    webhook_secret = os.getenv('RAZORPAY_WEBHOOK_SECRET', '')
+    body = request.get_data()
+    signature = request.headers.get('X-Razorpay-Signature', '')
+
+    if webhook_secret and signature:
+        expected = hmac.new(
+            webhook_secret.encode(), body, hashlib.sha256
+        ).hexdigest()
+        if not hmac.compare_digest(expected, signature):
+            return jsonify({"error": "Invalid webhook signature"}), 400
+
+    event = request.json or {}
+    if event.get('event') == 'payment.captured':
+        payment = event['payload']['payment']['entity']
+        db.payments.update_one(
+            {'razorpay_order_id': payment['order_id']},
+            {'$set': {
+                'payment_status': 'captured',
+                'razorpay_payment_id': payment['id'],
+                'webhook_received_at': datetime.now().isoformat()
+            }},
+            upsert=True
+        )
+    return jsonify({"status": "ok"})
 # ─────────────────────────────────────────────
 # BOOKINGS API
 # ─────────────────────────────────────────────

@@ -1574,101 +1574,197 @@ async function handleCheckoutNext() {
     const activePayLabel = document.querySelector(".pay-method-label.active");
     const payMethod = activePayLabel ? activePayLabel.getAttribute("data-method") || "card" : "card";
 
-    // Simulate successful rental booking creation
-    state.checkoutStep = 3;
-    const bookingId = "HR-" + Math.floor(100000 + Math.random() * 900000);
-    elements.orderTrackingId.textContent = bookingId;
+        // COD — skip gateway, finalize directly
+    if (payMethod === "cod") {
+      await finalizeBookingAndShowReceipt(payMethod, null);
+      return;
+    }
 
-    const custName = document.getElementById("shipping-name").value;
-    const custEmail = document.getElementById("shipping-email").value;
-    const custAddr = document.getElementById("shipping-address").value + ", " + document.getElementById("shipping-city").value + " - " + document.getElementById("shipping-zip").value;
-
-    const todayStr = new Date().toLocaleDateString("en-IN", { day: '2-digit', month: '2-digit', year: 'numeric' });
-
-    let primaryBooking = null;
-
-    // Persist each cart item as a booking to MongoDB
+    // Calculate total to charge (rupees)
+    let totalToCharge = 0;
     for (const item of state.cart) {
-      const baseAppliance = state.appliances.find(a => a.id === item.id) || {};
       const addonsTotal = (item.addons || []).reduce((sum, ad) => sum + ad.price, 0);
       const monthlyRate = item.price + addonsTotal;
       const months = item.tenureMonths || 1;
-      const totalAmount = monthlyRate * months * item.qty;
-      const dateRange = getRentalDateRange(months);
+      totalToCharge += monthlyRate * months * item.qty;
+    }
 
-      const vendorName = item.vendorName || baseAppliance.brand || baseAppliance.vendorName || "HomeRent Verified Vendor";
-      const vendorPhone = item.vendorPhone || baseAppliance.vendorPhone || baseAppliance.phone || "9876543210";
-      const vendorAddress = item.vendorAddress || baseAppliance.vendorAddress || baseAppliance.address || "Indiranagar, Bengaluru, Karnataka";
-      const category = item.category || baseAppliance.category || "Appliance";
+    const preBookingId = "HR-" + Math.floor(100000 + Math.random() * 900000);
 
-      const newBooking = {
-        id: bookingId,
-        user_id: custEmail,
-        customer_name: custName,
-        customerName: custName,
-        email: custEmail,
-        address: custAddr,
-        appliance_id: item.id,
-        applianceName: item.title,
-        appliance_name: item.title,
-        category: category,
-        tenure: `${months} ${months === 1 ? 'Month' : 'Months'}`,
-        tenure_months: months,
-        monthly_price: monthlyRate,
-        monthlyRent: monthlyRate,
-        total_amount: totalAmount,
-        totalRent: totalAmount,
-        paymentMethod: payMethod,
-        status: "Confirmed",
-        start_date: dateRange.startDateStr,
-        end_date: dateRange.endDateStr,
-        date: todayStr,
-        vendor_name: vendorName,
-        vendorName: vendorName,
-        vendor_phone: vendorPhone,
-        vendorPhone: vendorPhone,
-        vendor_address: vendorAddress,
-        vendorAddress: vendorAddress
-      };
-
-      if (!primaryBooking) primaryBooking = newBooking;
-
-      // Persist to MongoDB (creates booking + payment + revenue + inventory update + notifications)
-      try {
-        const authHeaders = { 'Content-Type': 'application/json' };
-        if (state.currentUser) {
-          authHeaders['X-User-Email'] = state.currentUser.email;
-          authHeaders['X-User-Role'] = state.currentUser.role;
-        }
-        await fetch('/api/bookings', {
-          method: 'POST',
-          headers: authHeaders,
-          body: JSON.stringify(newBooking)
-        });
-      } catch (err) {
-        console.error("Failed to save booking to DB:", err);
+    // 1. Create Razorpay order
+    let orderData;
+    try {
+      const res = await fetch('/api/payments/create-order', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-Email': state.currentUser.email,
+          'X-User-Role': state.currentUser.role
+        },
+        body: JSON.stringify({ amount: totalToCharge, receipt_id: preBookingId })
+      });
+      orderData = await res.json();
+      if (!res.ok || orderData.error) {
+        showToast(orderData.error || "Payment initialization failed", "error");
+        return;
       }
-
-      // Also update local state for immediate UI update
-      state.bookings.push(newBooking);
+    } catch (err) {
+      console.error("Create order failed:", err);
+      showToast("Could not reach payment server. Try again.", "error");
+      return;
     }
 
-    state.lastBooking = primaryBooking;
-    if (primaryBooking) {
-      renderReceiptUI(primaryBooking);
-    }
+    // 2. Open Razorpay Checkout
+    const options = {
+      key: orderData.key_id,
+      amount: orderData.amount,
+      currency: orderData.currency,
+      name: "HomeRent AI",
+      description: `Rental booking ${preBookingId}`,
+      order_id: orderData.order_id,
+      prefill: {
+        name: document.getElementById("shipping-name").value,
+        email: document.getElementById("shipping-email").value,
+        contact: document.getElementById("shipping-phone")?.value || ""
+      },
+      notes: { booking_id: preBookingId },
+      theme: { color: "#1e3f20" },
 
-    updateCheckoutStepUI();
+      handler: async function (response) {
+        try {
+          const verify = await fetch('/api/payments/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature
+            })
+          });
+          const result = await verify.json();
 
-    // Clear Customer Cart (also clears from MongoDB)
-    state.cart = [];
-    state.promoApplied = false;
-    elements.promoCode.value = "";
-    await saveCartToStorage();
-    updateCartUI();
+          if (result.success) {
+            await finalizeBookingAndShowReceipt('razorpay', result.payment_id, preBookingId);
+          } else {
+            showToast("Payment verification failed: " + (result.error || "Unknown error"), "error");
+          }
+        } catch (err) {
+          console.error("Verify failed:", err);
+          showToast("Payment verification error. Contact support.", "error");
+        }
+      },
 
-    showToast("Rental request placed successfully! You can view and download your receipt.", "success");
+      modal: {
+        ondismiss: function () {
+          showToast("Payment cancelled. You can try again.", "info");
+        }
+      }
+    };
+
+    const rzp = new Razorpay(options);
+    rzp.on('payment.failed', function (response) {
+      console.error("Payment failed:", response.error);
+      showToast("Payment failed: " + response.error.description, "error");
+    });
+    rzp.open();
   }
+}
+
+// ─────────────────────────────────────────────────────────
+// FINALIZE BOOKING (called after successful payment or COD)
+// ─────────────────────────────────────────────────────────
+async function finalizeBookingAndShowReceipt(payMethod, paymentId, providedBookingId) {
+  state.checkoutStep = 3;
+  const bookingId = providedBookingId || ("HR-" + Math.floor(100000 + Math.random() * 900000));
+  elements.orderTrackingId.textContent = bookingId;
+
+  const custName = document.getElementById("shipping-name").value;
+  const custEmail = document.getElementById("shipping-email").value;
+  const custAddr = document.getElementById("shipping-address").value + ", " + document.getElementById("shipping-city").value + " - " + document.getElementById("shipping-zip").value;
+  const todayStr = new Date().toLocaleDateString("en-IN", { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+  let primaryBooking = null;
+
+  for (const item of state.cart) {
+    const baseAppliance = state.appliances.find(a => a.id === item.id) || {};
+    const addonsTotal = (item.addons || []).reduce((sum, ad) => sum + ad.price, 0);
+    const monthlyRate = item.price + addonsTotal;
+    const months = item.tenureMonths || 1;
+    const totalAmount = monthlyRate * months * item.qty;
+    const dateRange = getRentalDateRange(months);
+
+    const vendorName    = item.vendorName    || baseAppliance.brand         || baseAppliance.vendorName || "HomeRent Verified Vendor";
+    const vendorPhone   = item.vendorPhone   || baseAppliance.vendorPhone   || baseAppliance.phone      || "9876543210";
+    const vendorAddress = item.vendorAddress || baseAppliance.vendorAddress || baseAppliance.address    || "Indiranagar, Bengaluru, Karnataka";
+    const category      = item.category      || baseAppliance.category      || "Appliance";
+
+    const newBooking = {
+      id: bookingId,
+      user_id: custEmail,
+      customer_name: custName,
+      customerName: custName,
+      email: custEmail,
+      address: custAddr,
+      appliance_id: item.id,
+      applianceName: item.title,
+      appliance_name: item.title,
+      category: category,
+      tenure: `${months} ${months === 1 ? 'Month' : 'Months'}`,
+      tenure_months: months,
+      monthly_price: monthlyRate,
+      monthlyRent: monthlyRate,
+      total_amount: totalAmount,
+      totalRent: totalAmount,
+      paymentMethod: payMethod,
+      paymentId: paymentId || null,
+      payment_status: payMethod === 'cod' ? 'pending' : 'paid',
+      status: "Confirmed",
+      start_date: dateRange.startDateStr,
+      end_date: dateRange.endDateStr,
+      date: todayStr,
+      vendor_name: vendorName,
+      vendorName: vendorName,
+      vendor_phone: vendorPhone,
+      vendorPhone: vendorPhone,
+      vendor_address: vendorAddress,
+      vendorAddress: vendorAddress
+    };
+
+    if (!primaryBooking) primaryBooking = newBooking;
+
+    try {
+      const authHeaders = { 'Content-Type': 'application/json' };
+      if (state.currentUser) {
+        authHeaders['X-User-Email'] = state.currentUser.email;
+        authHeaders['X-User-Role']  = state.currentUser.role;
+      }
+      await fetch('/api/bookings', {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify(newBooking)
+      });
+    } catch (err) {
+      console.error("Failed to save booking to DB:", err);
+    }
+
+    state.bookings.push(newBooking);
+  }
+
+  state.lastBooking = primaryBooking;
+  if (primaryBooking) renderReceiptUI(primaryBooking);
+
+  updateCheckoutStepUI();
+
+  state.cart = [];
+  state.promoApplied = false;
+  elements.promoCode.value = "";
+  await saveCartToStorage();
+  updateCartUI();
+
+  const successMsg = payMethod === 'cod'
+    ? "Order placed! Pay cash on delivery."
+    : "Payment successful! Booking confirmed.";
+  showToast(successMsg, "success");
 }
 
 function handleCheckoutBack() {

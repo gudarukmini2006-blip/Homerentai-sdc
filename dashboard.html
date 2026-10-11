@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="HomeRent AI rental dashboard.">
+  <title>HomeRent AI | Dashboard</title>
+  <link rel="stylesheet" href="styles.css">
+  <script>
+    (function() {
+      const session = localStorage.getItem('currentUser');
+      if (!session) {
+        window.location.replace('login.html');
+      } else {
+        const user = JSON.parse(session);
+        if (user.role === 'vendor') {
+          window.location.replace('appliances.html');
+        }
+      }
+    })();
+  </script>
+  <style>
+    .dashboard-page { min-height: 100vh; padding: 120px 0 4rem; background: radial-gradient(circle at 85% 12%, rgba(251,195,188,.35), transparent 30%), var(--bg-primary); }
+    .dashboard-shell { display:grid; grid-template-columns:220px minmax(0,1fr); gap:2rem; }
+    .dashboard-sidebar { padding:1rem; border-radius:22px; align-self:start; position:sticky; top:110px; }
+    .dashboard-sidebar nav { display:grid; gap:.35rem; margin-top:1rem; }
+    .dashboard-sidebar a { display:flex; align-items:center; gap:.7rem; padding:.8rem .9rem; border-radius:12px; color:var(--text-secondary); font-size:.88rem; }
+    .dashboard-sidebar a:hover, .dashboard-sidebar a.active { background:var(--accent-primary); color:var(--bg-secondary); }
+    .dashboard-kicker { color:var(--accent-gold); font-size:.75rem; font-weight:700; letter-spacing:.16em; text-transform:uppercase; }
+    .dashboard-heading { display:flex; justify-content:space-between; gap:1rem; align-items:end; margin-bottom:2rem; }
+    .dashboard-heading h1 { color:var(--accent-primary); font-size:clamp(2.2rem,5vw,4rem); line-height:1; margin-top:.5rem; }
+    .dashboard-heading p { color:var(--text-secondary); max-width:520px; margin-top:.8rem; }
+    .dashboard-actions { display:flex; gap:.7rem; flex-wrap:wrap; }
+    .dashboard-actions a { white-space:nowrap; }
+    .metric-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:1rem; margin-bottom:1.5rem; }
+    .metric-card { padding:1.35rem; border-radius:18px; background:var(--bg-secondary); border:1px solid var(--border-color); box-shadow:var(--shadow-sm); }
+    .metric-label { color:var(--text-secondary); font-size:.78rem; text-transform:uppercase; letter-spacing:.08em; }
+    .metric-value { display:block; color:var(--accent-primary); font-family:'Playfair Display',serif; font-size:2rem; margin:.55rem 0 .2rem; }
+    .metric-note { color:var(--accent-secondary); font-size:.75rem; }
+    .dashboard-grid { display:grid; grid-template-columns:minmax(0,1.45fr) minmax(280px,.85fr); gap:1.5rem; }
+    .dashboard-panel { background:var(--bg-secondary); border:1px solid var(--border-color); border-radius:20px; padding:1.5rem; box-shadow:var(--shadow-sm); }
+    .panel-heading { display:flex; justify-content:space-between; align-items:center; gap:1rem; margin-bottom:1.2rem; }
+    .panel-heading h2 { color:var(--accent-primary); font-size:1.35rem; }
+    .panel-heading a { color:var(--accent-gold); font-size:.8rem; font-weight:700; }
+    .rental-row { display:grid; grid-template-columns:52px minmax(0,1fr) auto auto; align-items:center; gap:.85rem; padding:.9rem 0; border-bottom:1px solid var(--border-color); }
+    .rental-row:last-child { border-bottom:0; }
+    .rental-thumb { width:52px; height:52px; border-radius:12px; object-fit:cover; background:var(--bg-tertiary); }
+    .rental-name { font-weight:700; font-size:.88rem; }
+    .rental-meta { color:var(--text-secondary); font-size:.75rem; margin-top:.15rem; }
+    .status-pill { border-radius:20px; padding:.35rem .65rem; background:rgba(127,161,129,.16); color:var(--accent-primary); font-size:.7rem; font-weight:700; text-transform:uppercase; }
+    .status-pill.pending { background:rgba(197,160,89,.14); color:var(--accent-gold); }
+    .rental-price { color:var(--accent-primary); font-weight:700; font-size:.85rem; }
+    .insight-box { padding:1.3rem; border-radius:16px; background:linear-gradient(135deg,var(--accent-primary),#356b43); color:white; margin-bottom:1rem; }
+    .insight-box h3 { color:white; font-size:1.25rem; margin-bottom:.45rem; }
+    .insight-box p { color:rgba(255,255,255,.78); font-size:.8rem; }
+    .progress-line { height:8px; border-radius:8px; background:rgba(255,255,255,.2); margin-top:1rem; overflow:hidden; }
+    .progress-line span { display:block; width:72%; height:100%; background:var(--accent-gold); border-radius:inherit; }
+    .category-list { display:grid; gap:1rem; }
+    .category-item { display:grid; grid-template-columns:1fr auto; gap:.6rem; font-size:.8rem; }
+    .category-item span { color:var(--text-secondary); }
+    .category-bar { grid-column:1 / -1; height:6px; background:var(--bg-tertiary); border-radius:6px; overflow:hidden; }
+    .category-bar i { display:block; height:100%; background:var(--accent-gold); border-radius:inherit; }
+    @media (max-width:900px) { .dashboard-shell{grid-template-columns:1fr}.dashboard-sidebar{position:static}.dashboard-sidebar nav{display:flex;overflow-x:auto}.dashboard-sidebar a{white-space:nowrap}.metric-grid{grid-template-columns:repeat(2,1fr)} }
+    @media (max-width:620px) { .dashboard-page{padding-top:104px}.dashboard-heading{display:block}.dashboard-actions{margin-top:1rem}.dashboard-grid{grid-template-columns:1fr}.metric-grid{gap:.7rem}.metric-card{padding:1rem}.metric-value{font-size:1.55rem}.rental-row{grid-template-columns:44px minmax(0,1fr) auto}.rental-thumb{width:44px;height:44px}.rental-price{grid-column:2} }
+  </style>
+</head>
+<body>
+  <header><div class="container"><nav class="nav-wrapper glass-panel">
+    <a href="home.html" class="logo" aria-label="HomeRent AI home"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12"/></svg> HomeRent AI</a>
+    <ul class="nav-links" id="main-nav-links"><li><a href="home.html">Home</a></li><li><a href="dashboard.html" class="active">Dashboard</a></li><li><a href="appliances.html">Browse Appliances</a></li></ul>
+    <div class="nav-actions">
+      <button id="dash-logout-btn" class="btn-secondary" style="padding: 0.45rem 0.9rem; border-radius: 20px; font-size: 0.8rem; font-weight: 600; border: 1px solid var(--border-color); display: inline-flex; align-items: center; gap: 0.4rem; cursor: pointer;">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+        <span>Log Out</span>
+      </button>
+      <button id="theme-toggle" class="icon-btn" aria-label="Toggle theme"><span aria-hidden="true">◐</span></button>
+    </div>
+  </nav></div></header>
+  <main class="dashboard-page"><div class="container dashboard-shell">
+    <aside class="dashboard-sidebar glass-panel"><span class="dashboard-kicker">Workspace</span><nav aria-label="Dashboard navigation"><a href="dashboard.html" class="active">▦ <span>Overview</span></a><a href="appliances.html">⌂ <span>Appliances</span></a><a href="home.html#values">✦ <span>Recommendations</span></a><a href="#" id="sidebar-logout-link">↪ <span>Log Out</span></a></nav></aside>
+      <section><div class="dashboard-heading"><div><span class="dashboard-kicker">Your rental workspace</span><h1>Good morning, Aarav.</h1><p>Review your rentals, savings, and next smart home upgrade in one place.</p></div><div class="dashboard-actions"><button id="open-service-modal-btn" class="btn-secondary" style="background: var(--bg-secondary); border: 1px solid var(--accent-gold); color: var(--accent-primary); font-weight: 700;">🛠️ Request Free Maintenance</button><a href="appliances.html" class="btn-primary">+ Rent an appliance</a></div></div>
+      <div class="metric-grid"><article class="metric-card"><span class="metric-label">Active rentals</span><strong class="metric-value">2</strong><span class="metric-note">All services on track</span></article><article class="metric-card"><span class="metric-label">Monthly spend</span><strong class="metric-value">₹2,398</strong><span class="metric-note">12% below your plan</span></article><article class="metric-card"><span class="metric-label">Home savings</span><strong class="metric-value">₹8,420</strong><span class="metric-note">Compared with buying</span></article><article class="metric-card"><span class="metric-label">Energy score</span><strong class="metric-value">A+</strong><span class="metric-note">Excellent efficiency</span></article></div>
+      <div class="dashboard-grid"><div class="dashboard-panel"><div class="panel-heading"><h2>Your current rentals</h2><a href="appliances.html">Browse more</a></div><div class="rental-row"><img class="rental-thumb" src="assets/images/smart_refrigerator.jpg" alt="Smart refrigerator"><div><div class="rental-name">Smart Double-Door Refrigerator</div><div class="rental-meta">12 month plan · Renews 12 Jul 2027</div></div><span class="status-pill">Active</span><strong class="rental-price">₹1,299/mo</strong></div><div class="rental-row"><img class="rental-thumb" src="assets/images/washing_machine.jpg" alt="Washing machine"><div><div class="rental-name">Front Load Inverter Washing Machine</div><div class="rental-meta">6 month plan · Delivery scheduled</div></div><span class="status-pill pending">Pending</span><strong class="rental-price">₹1,099/mo</strong></div><div class="rental-row"><img class="rental-thumb" src="assets/images/air_purifier.jpg" alt="Air purifier"><div><div class="rental-name">Suggested next: HEPA Air Purifier</div><div class="rental-meta">Cleaner air for your living room</div></div><a href="appliances.html" class="panel-heading" style="margin:0">View</a></div></div><div><div class="insight-box"><h3>Your next smart move</h3><p>Adding an air purifier would improve your home's estimated air quality by 18% this season.</p><div class="progress-line"><span></span></div></div><div class="dashboard-panel"><div class="panel-heading"><h2>Rental mix</h2><span class="dashboard-kicker">This month</span></div><div class="category-list"><div class="category-item"><span>Kitchen</span><strong>52%</strong><div class="category-bar"><i style="width:52%"></i></div></div><div class="category-item"><span>Laundry</span><strong>28%</strong><div class="category-bar"><i style="width:28%"></i></div></div><div class="category-item"><span>Climate</span><strong>20%</strong><div class="category-bar"><i style="width:20%"></i></div></div></div></div></div></div>
+    </section>
+
+    <!-- Maintenance Service Modal -->
+    <div id="service-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); z-index: 500; backdrop-filter: blur(8px); align-items: center; justify-content: center;">
+      <div style="background: var(--bg-secondary); border-radius: 20px; padding: 2rem; max-width: 480px; width: 90%; border: 1px solid var(--border-color); box-shadow: var(--shadow-lg);">
+        <h3 class="font-serif" style="font-size: 1.5rem; color: var(--accent-primary); margin-bottom: 0.5rem;">🛠️ Free 24h Service &amp; Repair Request</h3>
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.2rem;">All HomeRent AI subscriptions include 100% free filter cleanups, routine servicing, and emergency repairs within 24 hours.</p>
+        <form id="service-req-form" style="display: flex; flex-direction: column; gap: 1rem;">
+          <div>
+            <label style="font-size: 0.78rem; font-weight: 700; text-transform: uppercase; color: var(--text-secondary);">Select Rented Appliance</label>
+            <select id="service-appliance-select" class="form-input" style="width: 100%; height: 44px; margin-top: 0.3rem;" required>
+              <option value="Smart Double-Door Refrigerator">Smart Double-Door Refrigerator</option>
+              <option value="Front Load Inverter Washing Machine">Front Load Inverter Washing Machine</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size: 0.78rem; font-weight: 700; text-transform: uppercase; color: var(--text-secondary);">Service Type</label>
+            <select id="service-type-select" class="form-input" style="width: 100%; height: 44px; margin-top: 0.3rem;">
+              <option value="Filter Clean & Hygiene Servicing">Filter Clean & Hygiene Servicing</option>
+              <option value="Cooling / Water Temp Adjustment">Cooling / Water Temp Adjustment</option>
+              <option value="Relocation / Uninstallation Request">Relocation / Uninstallation Request</option>
+              <option value="Emergency Repair Inspection">Emergency Repair Inspection</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size: 0.78rem; font-weight: 700; text-transform: uppercase; color: var(--text-secondary);">Preferred Visit Time</label>
+            <input type="datetime-local" class="form-input" style="width: 100%; height: 44px; margin-top: 0.3rem;" required>
+          </div>
+          <div style="display: flex; gap: 0.8rem; justify-content: flex-end; margin-top: 0.5rem;">
+            <button type="button" id="close-service-modal-btn" class="btn-secondary" style="padding: 0.6rem 1.2rem; font-size: 0.85rem;">Cancel</button>
+            <button type="submit" class="btn-primary" style="padding: 0.6rem 1.4rem; font-size: 0.85rem;">Book Technician Visit</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div></main>
+  <script>
+    const themeToggle=document.getElementById('theme-toggle');
+    const theme=localStorage.getItem('theme')||'light';
+    document.documentElement.setAttribute('data-theme',theme);
+    themeToggle.addEventListener('click',()=>{const next=document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark';document.documentElement.setAttribute('data-theme',next);localStorage.setItem('theme',next);});
+
+    // Service Modal Handler
+    const sModal = document.getElementById("service-modal");
+    document.getElementById("open-service-modal-btn").onclick = () => sModal.style.display = "flex";
+    document.getElementById("close-service-modal-btn").onclick = () => sModal.style.display = "none";
+    document.getElementById("service-req-form").onsubmit = (e) => {
+      e.preventDefault();
+      alert("Technician visit confirmed! A certified technician will visit your location within 24 hours.");
+      sModal.style.display = "none";
+    };
+
+    function doDashboardLogout(e) {
+      if (e) e.preventDefault();
+      localStorage.removeItem('currentUser');
+      window.location.replace('login.html');
+    }
+    const dashLogoutBtn = document.getElementById("dash-logout-btn");
+    if (dashLogoutBtn) dashLogoutBtn.addEventListener("click", doDashboardLogout);
+    const sideLogoutLink = document.getElementById("sidebar-logout-link");
+    if (sideLogoutLink) sideLogoutLink.addEventListener("click", doDashboardLogout);
+
+    // ─── Load Real Data from MongoDB ───────────────────────────
+    (async function() {
+      const session = localStorage.getItem('currentUser');
+      if (!session) return;
+      const user = JSON.parse(session);
+
+      // Update greeting
+      const nameEl = document.querySelector('.dashboard-heading h1');
+      if (nameEl && user.name) {
+        const hour = new Date().getHours();
+        const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+        nameEl.textContent = `${greeting}, ${user.name.split(' ')[0]}.`;
+      }
+
+      // Vendor actions
+      const actionsContainer = document.querySelector('.dashboard-actions');
+      if (actionsContainer && user.role === 'vendor') {
+        actionsContainer.innerHTML = `
+          <a href="appliances.html?openVendorModal=true" class="btn-primary" style="background: var(--accent-gold); color: #1c221e;">+ Add Appliance to Fleet Inventory</a>
+          <a href="appliances.html" class="btn-secondary">Open Vendor Console</a>
+        `;
+      }
+
+      // ─── Fetch bookings from MongoDB ───
+      try {
+        const [bookingsRes, revenueRes] = await Promise.all([
+          fetch('/api/bookings'),
+          fetch('/api/revenue')
+        ]);
+
+        const allBookings = await bookingsRes.json();
+        const allRevenue = await revenueRes.json();
+
+        // Filter bookings for this user
+        const myBookings = allBookings.filter(b =>
+          b.email === user.email || b.user_id === user.email
+        );
+
+        // ─── Update metrics ───
+        const activeCount = myBookings.filter(b => b.status === 'active').length;
+        const pendingCount = myBookings.filter(b => b.status === 'pending').length;
+        const totalSpend = myBookings
+          .filter(b => b.status === 'active' || b.status === 'pending')
+          .reduce((s, b) => s + (b.totalRent || b.total_amount || 0), 0);
+        const savings = Math.round(totalSpend * 28 * 0.9); // estimated savings vs buying
+
+        const metricCards = document.querySelectorAll('.metric-card');
+        if (metricCards[0]) {
+          metricCards[0].querySelector('.metric-value').textContent = activeCount + pendingCount;
+          metricCards[0].querySelector('.metric-note').textContent = activeCount + ' active, ' + pendingCount + ' pending';
+        }
+        if (metricCards[1]) {
+          metricCards[1].querySelector('.metric-value').textContent = '₹' + Math.round(totalSpend).toLocaleString('en-IN');
+          metricCards[1].querySelector('.metric-note').textContent = myBookings.length + ' total rental(s)';
+        }
+        if (metricCards[2]) {
+          metricCards[2].querySelector('.metric-value').textContent = '₹' + savings.toLocaleString('en-IN');
+          metricCards[2].querySelector('.metric-note').textContent = 'Compared with buying';
+        }
+
+        // ─── Render bookings list ───
+        const rentalPanel = document.querySelector('.dashboard-panel');
+        if (rentalPanel && myBookings.length > 0) {
+          // Keep "Browse more" link and heading
+          const panelHeading = rentalPanel.querySelector('.panel-heading');
+          rentalPanel.innerHTML = '';
+          if (panelHeading) rentalPanel.appendChild(panelHeading);
+
+          // Image map
+          const imgMap = { kitchen:'assets/images/smart_refrigerator.jpg', laundry:'assets/images/washing_machine.jpg', climate:'assets/images/air_conditioner.jpg', living:'assets/images/air_purifier.jpg' };
+
+          myBookings.slice(0, 5).forEach(b => {
+            const statusClass = b.status === 'active' ? '' : b.status === 'completed' ? 'completed' : 'pending';
+            const statusLabel = b.status === 'active' ? 'Active' : b.status === 'completed' ? 'Completed' : 'Pending';
+            const img = imgMap[b.category] || 'assets/images/smart_refrigerator.jpg';
+            const row = document.createElement('div');
+            row.className = 'rental-row';
+            row.innerHTML = `
+              <img class="rental-thumb" src="${img}" alt="${b.applianceName}">
+              <div>
+                <div class="rental-name">${b.applianceName}</div>
+                <div class="rental-meta">${b.tenure || '3 month plan'} · Booked on ${b.date || b.start_date}</div>
+              </div>
+              <span class="status-pill ${statusClass}">${statusLabel}</span>
+              <strong class="rental-price">₹${Math.round(b.totalRent || b.total_amount || 0).toLocaleString('en-IN')}/mo</strong>
+            `;
+            rentalPanel.appendChild(row);
+          });
+
+          // Suggested next
+          const suggestRow = document.createElement('div');
+          suggestRow.className = 'rental-row';
+          suggestRow.innerHTML = `
+            <img class="rental-thumb" src="assets/images/air_purifier.jpg" alt="Air purifier">
+            <div>
+              <div class="rental-name">Suggested next: HEPA Air Purifier</div>
+              <div class="rental-meta">Cleaner air for your living room</div>
+            </div>
+            <a href="appliances.html" class="panel-heading" style="margin:0">View</a>
+          `;
+          rentalPanel.appendChild(suggestRow);
+        }
+
+      } catch(err) {
+        console.log('Dashboard: using static data (DB unavailable)');
+      }
+    })();
+  </script>
+</body>
+</html>

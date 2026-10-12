@@ -152,34 +152,3 @@ HMAC-SHA256 signature verified on every payment
 Booking only created after signature verification
 
 Real cards automatically rejected in Test Mode
-
-text
-
----
-
-## 🎯 Save It
-
-**In Notepad:**
-1. Paste everything above
-2. **File → Save As**
-3. Navigate to: `D:\home-rent-AI`
-4. **File name:** `"README.md"` *(include the quotes)*
-5. **Save as type:** All Files (*.*)
-6. **Encoding:** UTF-8
-7. Save
-
----
-
-## 🚀 Push It
-
-```cmd
-cd D:\home-rent-AI
-git add README.md
-git commit -m "Add README for Razorpay integration"
-git push
-✅ Verify
-Open: https://github.com/shradha-2022/home-rent-AI
-
-Your README will display on the repo homepage.
-
-Done. 🎉

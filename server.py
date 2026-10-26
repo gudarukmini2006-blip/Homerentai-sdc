@@ -13,6 +13,8 @@ import razorpay
 import hmac
 import hashlib
 
+from lstm_forecaster import generate_demand_forecast, get_vendor_appliances_and_counts
+
 # Automatically load variables from .env file if it exists
 def load_env_file():
     env_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
@@ -32,7 +34,8 @@ RAZORPAY_KEY_ID = os.getenv('RAZORPAY_KEY_ID', '')
 RAZORPAY_KEY_SECRET = os.getenv('RAZORPAY_KEY_SECRET', '')
 razorpay_client = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET)) if RAZORPAY_KEY_ID else None
 
-app = Flask(__name__, static_folder='.')
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+app = Flask(__name__, static_folder=BASE_DIR)
 PORT = int(os.getenv('PORT', 5000))
 HOST = os.getenv('HOST', '0.0.0.0')
 MONGO_URI = os.getenv('MONGO_URI', 'mongodb://127.0.0.1:27017')
@@ -174,6 +177,17 @@ def connect_to_mongo():
         client.admin.command('ping')
         db = client[DB_NAME]
         print(f'Connected to MongoDB database: {DB_NAME}')
+        # Enforce Compound Index on Users for role-specific email uniqueness:
+        # One email can have 1 customer account and 1 vendor account; duplicates for the same role are blocked.
+        try:
+            db.users.create_index([('email', 1), ('role', 1)], unique=True)
+            db.categories.create_index('category_name', unique=True)
+            db.return_requests.create_index('request_id', unique=True)
+            db.return_requests.create_index('customer_email')
+            db.return_requests.create_index('vendor_email')
+            db.return_requests.create_index('booking_id')
+        except Exception as idx_err:
+            print("Index creation notice:", idx_err)
         seed_database()
     except Exception as e:
         print('Failed to connect to MongoDB:', e)
@@ -289,6 +303,22 @@ def seed_database():
 
 connect_to_mongo()
 
+@app.before_request
+def handle_preflight():
+    if request.method == 'OPTIONS':
+        response = app.make_default_options_response()
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, X-User-Email, X-User-Role, Authorization'
+        return response
+
+@app.after_request
+def add_cors_headers(response):
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, X-User-Email, X-User-Role, Authorization'
+    return response
+
 # ─────────────────────────────────────────────
 # HELPER
 # ─────────────────────────────────────────────
@@ -317,35 +347,45 @@ def get_users():
 @app.route('/api/users', methods=['POST'])
 def handle_user():
     if db is None: return jsonify({"error": "DB not connected"}), 500
-    data = request.json
+    data = request.json or {}
     action = data.get('action', 'register')
 
     if action == 'login':
-        email = data.get('email', '').lower()
+        email = data.get('email', '').strip().lower()
         password = data.get('password', '')
-        role = data.get('role', 'customer')
+        role = data.get('role', 'customer').strip().lower()
         user = db.users.find_one({'email': email, 'password': password, 'role': role})
         if not user:
-            return jsonify({"error": "Invalid email, password, or role."}), 401
+            return jsonify({"error": f"Invalid email, password, or role for {role.capitalize()}."}), 401
         return jsonify(clean(user))
 
     elif action == 'register':
-        email = data.get('email', '').lower()
-        existing = db.users.find_one({'email': email})
+        email = data.get('email', '').strip().lower()
+        role = data.get('role', 'customer').strip().lower()
+        if not email:
+            return jsonify({"error": "Email address is required."}), 400
+        if role not in ['customer', 'vendor']:
+            return jsonify({"error": "Invalid role specified. Must be customer or vendor."}), 400
+        
+        # Enforce single email restriction per role:
+        # A single email can register once as Customer and once as Vendor.
+        # Disallow duplicate registration for the SAME role.
+        existing = db.users.find_one({'email': email, 'role': role})
         if existing:
-            return jsonify({"error": "An account with this email already exists."}), 409
+            return jsonify({"error": f"An account with this email already exists as a {role.capitalize()}."}), 409
+
         new_user = {
-            'name': data.get('name', ''),
+            'name': data.get('name', '').strip(),
             'email': email,
             'password': data.get('password', ''),
-            'phone': data.get('phone', ''),
-            'role': data.get('role', 'customer')
+            'phone': data.get('phone', '').strip(),
+            'role': role
         }
         db.users.insert_one(new_user)
         # Notification for new registration
         db.notifications.insert_one({
             'user_id': email,
-            'message': 'Welcome to HomeRent AI! Your account has been created successfully.',
+            'message': f'Welcome to HomeRent AI! Your {role.capitalize()} account has been created successfully.',
             'type': 'welcome',
             'is_read': False,
             'created_at': datetime.now().isoformat()
@@ -353,13 +393,106 @@ def handle_user():
         return jsonify(clean(new_user)), 201
 
 # ─────────────────────────────────────────────
-# CATEGORIES API
+# CATEGORIES API (DYNAMIC CATEGORY MANAGEMENT)
 # ─────────────────────────────────────────────
 
 @app.route('/api/categories', methods=['GET'])
 def get_categories():
     if db is None: return jsonify({"error": "DB not connected"}), 500
-    return jsonify(clean_list(db.categories.find()))
+    active_only = request.args.get('active_only', '').lower() in ('true', '1')
+    query = {'is_active': True} if active_only else {}
+    cats = list(db.categories.find(query))
+    result = []
+    for c in cats:
+        c_clean = clean(c)
+        cat_slug = c.get('category_name', '')
+        # Count appliances associated with this category in MongoDB
+        c_clean['appliance_count'] = db.appliances.count_documents({'category': cat_slug})
+        result.append(c_clean)
+    return jsonify(result)
+
+@app.route('/api/categories', methods=['POST'])
+def add_category():
+    if db is None: return jsonify({"error": "DB not connected"}), 500
+    role = (request.headers.get('X-User-Role') or '').strip().lower()
+    if role and role != 'vendor':
+        return jsonify({"error": "Forbidden: Vendor access required to add categories"}), 403
+
+    data = request.json or {}
+    raw_name = data.get('category_name', '').strip()
+    display_name = data.get('display_name', '').strip() or raw_name.title()
+    if not raw_name:
+        return jsonify({"error": "Category name / identifier is required"}), 400
+
+    slug = raw_name.lower().replace(' ', '-').replace('_', '-')
+    existing = db.categories.find_one({'category_name': slug})
+    if existing:
+        return jsonify({"error": f"A category with identifier '{slug}' already exists."}), 409
+
+    now_iso = datetime.now().isoformat()
+    new_cat = {
+        'category_name': slug,
+        'display_name': display_name,
+        'description': data.get('description', '').strip(),
+        'icon': data.get('icon', '📦').strip() or '📦',
+        'is_active': bool(data.get('is_active', True)),
+        'created_at': now_iso,
+        'updated_at': now_iso
+    }
+    db.categories.insert_one(new_cat)
+    res_clean = clean(new_cat)
+    res_clean['appliance_count'] = 0
+    return jsonify(res_clean), 201
+
+@app.route('/api/categories/<cat_name>', methods=['PUT'])
+def update_category(cat_name):
+    if db is None: return jsonify({"error": "DB not connected"}), 500
+    role = (request.headers.get('X-User-Role') or '').strip().lower()
+    if role and role != 'vendor':
+        return jsonify({"error": "Forbidden: Vendor access required to update categories"}), 403
+
+    cat_slug = cat_name.strip().lower()
+    existing = db.categories.find_one({'category_name': cat_slug})
+    if not existing:
+        return jsonify({"error": f"Category '{cat_slug}' not found"}), 404
+
+    data = request.json or {}
+    update_fields = {'updated_at': datetime.now().isoformat()}
+    if 'display_name' in data:
+        update_fields['display_name'] = data['display_name'].strip()
+    if 'description' in data:
+        update_fields['description'] = data['description'].strip()
+    if 'icon' in data:
+        update_fields['icon'] = data['icon'].strip()
+    if 'is_active' in data:
+        update_fields['is_active'] = bool(data['is_active'])
+
+    db.categories.update_one({'category_name': cat_slug}, {'$set': update_fields})
+    updated = db.categories.find_one({'category_name': cat_slug})
+    up_clean = clean(updated)
+    up_clean['appliance_count'] = db.appliances.count_documents({'category': cat_slug})
+    return jsonify(up_clean)
+
+@app.route('/api/categories/<cat_name>', methods=['DELETE'])
+def delete_category(cat_name):
+    if db is None: return jsonify({"error": "DB not connected"}), 500
+    role = (request.headers.get('X-User-Role') or '').strip().lower()
+    if role and role != 'vendor':
+        return jsonify({"error": "Forbidden: Vendor access required to delete categories"}), 403
+
+    cat_slug = cat_name.strip().lower()
+    existing = db.categories.find_one({'category_name': cat_slug})
+    if not existing:
+        return jsonify({"error": f"Category '{cat_slug}' not found"}), 404
+
+    app_count = db.appliances.count_documents({'category': cat_slug})
+    if app_count > 0:
+        return jsonify({
+            "error": f"Cannot delete category '{existing.get('display_name', cat_slug)}' because {app_count} appliance(s) are currently associated with it. You can deactivate it instead to hide it from customer listings."
+        }), 400
+
+    db.categories.delete_one({'category_name': cat_slug})
+    return jsonify({"success": True, "message": f"Category '{cat_slug}' deleted successfully."})
 
 # ─────────────────────────────────────────────
 # APPLIANCES API
@@ -905,21 +1038,41 @@ def add_booking():
     if 'category' not in booking and app_doc:
         booking['category'] = app_doc.get('category', 'kitchen')
 
-    # Ensure status is set
-    booking['status'] = booking.get('status', 'confirmed')
+    # Payment Method & Status Configuration
+    pay_method = (booking.get('paymentMethod') or booking.get('payment_method') or 'cod').lower()
+    is_online = pay_method in ['razorpay', 'online', 'upi']
+
+    if is_online:
+        booking['paymentMethod'] = 'razorpay'
+        booking['payment_method'] = 'razorpay'
+        booking['payment_status'] = 'paid'
+        booking['status'] = booking.get('status', 'active')
+        if not booking.get('receipt_number'):
+            booking['receipt_number'] = f"REC-ONL-{int(time.time()*1000)%10000000:07d}"
+    else:
+        booking['paymentMethod'] = 'cod'
+        booking['payment_method'] = 'cod'
+        booking['payment_status'] = 'pending'
+        booking['status'] = booking.get('status', 'confirmed')
+        if not booking.get('receipt_number'):
+            booking['receipt_number'] = f"REC-COD-{int(time.time()*1000)%10000000:07d}"
 
     db.bookings.insert_one(dict(booking))
 
     # Payment record
-    payment_method = booking.get('paymentMethod', 'card')
-    db.payments.insert_one({
+    payment_record = {
+        'receipt_number': booking['receipt_number'],
         'booking_id': booking.get('id'),
         'user_id': booking.get('email', booking.get('user_id', '')),
         'amount': booking.get('totalRent', booking.get('total_amount', 0)),
-        'payment_method': payment_method,
-        'payment_status': 'paid',
+        'payment_method': 'razorpay' if is_online else 'cod',
+        'payment_status': 'paid' if is_online else 'pending',
         'payment_date': datetime.now().isoformat()
-    })
+    }
+    if is_online:
+        payment_record['razorpay_payment_id'] = booking.get('razorpay_payment_id')
+        payment_record['razorpay_order_id'] = booking.get('razorpay_order_id')
+    db.payments.insert_one(payment_record)
 
     # Revenue record
     db.revenue.insert_one({
@@ -927,7 +1080,7 @@ def add_booking():
         'vendor_email': vendor_email,
         'amount': booking.get('totalRent', booking.get('total_amount', 0)),
         'date': booking.get('date', datetime.now().strftime('%d/%m/%Y')),
-        'payment_status': 'paid'
+        'payment_status': 'paid' if is_online else 'pending'
     })
 
     # Update inventory — decrement available, increment rented
@@ -1018,6 +1171,248 @@ def bulk_bookings():
         if 'id' in b:
             db.bookings.update_one({'id': b['id']}, {'$set': b}, upsert=True)
     return jsonify({"success": True})
+
+@app.route('/api/bookings/<booking_id>/cod-confirm', methods=['PUT'])
+def confirm_cod_payment(booking_id):
+    if db is None: return jsonify({"error": "DB not connected"}), 500
+    role = (request.headers.get('X-User-Role') or '').strip().lower()
+    if role and role != 'vendor':
+        return jsonify({"error": "Forbidden: Vendor access required to confirm cash collection"}), 403
+
+    booking = db.bookings.find_one({'id': booking_id})
+    if not booking:
+        return jsonify({"error": "Booking not found"}), 404
+
+    req_vendor = (request.headers.get('X-User-Email') or (request.json and request.json.get('vendor_email')) or '').strip().lower()
+    owner_vendor = (booking.get('vendor_email') or 'vendor@homerent.ai').strip().lower()
+    if req_vendor and req_vendor != owner_vendor:
+        return jsonify({"error": "Forbidden: You can only confirm COD payments for your own appliances"}), 403
+
+    db.bookings.update_one({'id': booking_id}, {'$set': {'payment_status': 'paid'}})
+    db.payments.update_one({'booking_id': booking_id}, {'$set': {'payment_status': 'paid', 'confirmed_at': datetime.now().isoformat()}})
+    db.revenue.update_one({'booking_id': booking_id}, {'$set': {'payment_status': 'paid'}})
+
+    amount = booking.get('totalRent', booking.get('total_amount', 0))
+    cust_email = (booking.get('email') or booking.get('user_id') or '').strip().lower()
+    if cust_email:
+        db.notifications.insert_one({
+            'user_id': cust_email,
+            'message': f"Payment Received: Cash payment of ₹{amount:,.0f} for rental #{booking_id} has been verified and marked as Paid by the vendor.",
+            'type': 'payment_confirmed',
+            'is_read': False,
+            'created_at': datetime.now().isoformat()
+        })
+
+    return jsonify({"success": True, "message": f"Cash on delivery payment of ₹{amount:,.0f} marked as Paid."})
+
+# ─────────────────────────────────────────────
+# APPLIANCE RETURN REQUESTS API
+# ─────────────────────────────────────────────
+
+@app.route('/api/return-requests', methods=['GET'])
+def get_return_requests():
+    if db is None: return jsonify({"error": "DB not connected"}), 500
+    user_email = (request.args.get('email') or request.headers.get('X-User-Email') or '').strip().lower()
+    role = (request.args.get('role') or request.headers.get('X-User-Role') or '').strip().lower()
+
+    query = {}
+    if role == 'customer' and user_email:
+        query['customer_email'] = user_email
+    elif role == 'vendor' and user_email:
+        query['vendor_email'] = user_email
+
+    requests_list = list(db.return_requests.find(query).sort('created_at', -1))
+    return jsonify(clean_list(requests_list))
+
+@app.route('/api/return-requests', methods=['POST'])
+def create_return_request():
+    if db is None: return jsonify({"error": "DB not connected"}), 500
+    data = request.json or {}
+    cust_email = (data.get('customer_email') or request.headers.get('X-User-Email') or '').strip().lower()
+    booking_id = data.get('booking_id')
+    requested_pickup_date = data.get('requested_pickup_date', '').strip()
+    reason = data.get('reason', '').strip()
+
+    if not cust_email:
+        return jsonify({"error": "Customer email is required"}), 401
+    if not booking_id:
+        return jsonify({"error": "Booking ID is required"}), 400
+    if not reason:
+        return jsonify({"error": "Reason for return is required"}), 400
+
+    booking = db.bookings.find_one({'id': booking_id})
+    if not booking:
+        return jsonify({"error": f"Booking '{booking_id}' not found"}), 404
+
+    # RBAC: Verify customer owns booking
+    owner_cust = (booking.get('email') or booking.get('user_id') or '').strip().lower()
+    if cust_email != owner_cust:
+        return jsonify({"error": "Forbidden: You can only submit return requests for your own rental bookings"}), 403
+
+    # Check booking status: must be active/confirmed
+    b_status = (booking.get('status') or '').lower()
+    if b_status in ['completed', 'cancelled', 'returned']:
+        return jsonify({"error": f"Cannot return an appliance for a booking that is already {b_status}."}), 400
+
+    # Prevent duplicate active return requests
+    existing_req = db.return_requests.find_one({
+        'booking_id': booking_id,
+        'status': {'$in': ['pending', 'accepted', 'pickup_scheduled']}
+    })
+    if existing_req:
+        return jsonify({
+            "error": f"An active return request is already in progress for this booking (Request ID: {existing_req.get('request_id')})."
+        }), 409
+
+    # Calculate remaining days and return policy eligibility
+    # Advance-notice period is 3 days
+    end_date_str = booking.get('end_date', '')
+    days_remaining = None
+    if end_date_str:
+        for fmt in ('%d/%m/%Y', '%Y-%m-%d', '%d-%m-%Y'):
+            try:
+                dt_end = datetime.strptime(end_date_str.strip(), fmt).date()
+                today_date = date.today()
+                days_remaining = (dt_end - today_date).days
+                break
+            except Exception:
+                pass
+
+    if days_remaining is not None:
+        if days_remaining < 3 and days_remaining >= 0:
+            return jsonify({
+                "error": f"Return policy violation: Return requests must be submitted with at least 3 days advance notice before the rental tenure ends ({end_date_str}). Remaining days: {days_remaining}."
+            }), 400
+        elif days_remaining < 0:
+            return jsonify({
+                "error": f"Rental tenure ended on {end_date_str}. Please contact support or vendor for overdue return assistance."
+            }), 400
+
+    req_id = f"RET-{int(time.time()*1000)%10000000:07d}"
+    now_iso = datetime.now().isoformat()
+    return_doc = {
+        'request_id': req_id,
+        'booking_id': booking_id,
+        'appliance_id': booking.get('appliance_id'),
+        'appliance_name': booking.get('applianceName') or booking.get('appliance_name', 'Appliance'),
+        'category': booking.get('category', 'kitchen'),
+        'customer_email': cust_email,
+        'customer_name': booking.get('customerName') or booking.get('customer_name') or 'Customer',
+        'customer_phone': booking.get('customerPhone') or booking.get('phone', ''),
+        'vendor_email': (booking.get('vendor_email') or 'vendor@homerent.ai').strip().lower(),
+        'rental_start_date': booking.get('start_date', ''),
+        'rental_end_date': end_date_str,
+        'remaining_days_at_request': days_remaining if days_remaining is not None else 30,
+        'requested_pickup_date': requested_pickup_date or datetime.now().strftime('%d/%m/%Y'),
+        'reason': reason,
+        'status': 'pending',
+        'vendor_response': '',
+        'scheduled_pickup_date': '',
+        'created_at': now_iso,
+        'updated_at': now_iso
+    }
+    db.return_requests.insert_one(return_doc)
+
+    # Notify vendor
+    db.notifications.insert_one({
+        'user_id': return_doc['vendor_email'],
+        'message': f"New Return Request #{req_id}: Customer {return_doc['customer_name']} requested pickup for {return_doc['appliance_name']}.",
+        'type': 'return_request',
+        'is_read': False,
+        'created_at': now_iso
+    })
+
+    return jsonify(clean(return_doc)), 201
+
+@app.route('/api/return-requests/<request_id>', methods=['PUT'])
+def update_return_request(request_id):
+    if db is None: return jsonify({"error": "DB not connected"}), 500
+    role = (request.headers.get('X-User-Role') or '').strip().lower()
+    if role and role != 'vendor':
+        return jsonify({"error": "Forbidden: Vendor access required to manage return requests"}), 403
+
+    req_doc = db.return_requests.find_one({'request_id': request_id})
+    if not req_doc:
+        return jsonify({"error": f"Return request '{request_id}' not found"}), 404
+
+    vendor_email = (request.headers.get('X-User-Email') or '').strip().lower()
+    owner_vendor = (req_doc.get('vendor_email') or 'vendor@homerent.ai').strip().lower()
+    if vendor_email and vendor_email != owner_vendor:
+        return jsonify({"error": "Forbidden: You can only manage return requests for your own appliances"}), 403
+
+    data = request.json or {}
+    new_status = data.get('status')
+    vendor_response = data.get('vendor_response', '').strip()
+    scheduled_date = data.get('scheduled_pickup_date', '').strip()
+
+    valid_statuses = ['pending', 'accepted', 'rejected', 'pickup_scheduled', 'returned', 'closed']
+    if new_status and new_status not in valid_statuses:
+        return jsonify({"error": f"Invalid status '{new_status}'. Valid values: {valid_statuses}"}), 400
+
+    now_iso = datetime.now().isoformat()
+    update_data = {'updated_at': now_iso}
+    if new_status:
+        update_data['status'] = new_status
+    if vendor_response:
+        update_data['vendor_response'] = vendor_response
+    if scheduled_date:
+        update_data['scheduled_pickup_date'] = scheduled_date
+
+    db.return_requests.update_one({'request_id': request_id}, {'$set': update_data})
+
+    # If status is 'returned' or 'closed' -> complete booking, restore inventory, record in db.returns
+    if new_status in ('returned', 'closed'):
+        booking_id = req_doc.get('booking_id')
+        db.bookings.update_one({'id': booking_id}, {'$set': {'status': 'completed'}})
+
+        appliance_int_id = req_doc.get('appliance_id')
+        if appliance_int_id:
+            try:
+                db.inventory.update_one(
+                    {'appliance_int_id': int(appliance_int_id)},
+                    {'$inc': {'available_quantity': 1, 'rented_quantity': -1}}
+                )
+            except Exception:
+                pass
+
+        db.returns.insert_one({
+            'return_request_id': request_id,
+            'booking_id': booking_id,
+            'appliance_id': appliance_int_id,
+            'return_date': datetime.now().strftime('%d/%m/%Y'),
+            'condition': 'good',
+            'late_fee': 0,
+            'vendor_confirmed': True,
+            'created_at': now_iso
+        })
+
+        # Notify customer
+        db.notifications.insert_one({
+            'user_id': req_doc['customer_email'],
+            'message': f"Return Completed: Your rental #{booking_id} ({req_doc['appliance_name']}) has been successfully returned and inspected.",
+            'type': 'return_completed',
+            'is_read': False,
+            'created_at': now_iso
+        })
+    elif new_status == 'accepted':
+        db.notifications.insert_one({
+            'user_id': req_doc['customer_email'],
+            'message': f"Return Request Accepted: Vendor accepted your return request for {req_doc['appliance_name']}. Note: {vendor_response or 'Pickup will be scheduled.'}",
+            'type': 'return_accepted',
+            'is_read': False,
+            'created_at': now_iso
+        })
+    elif new_status == 'rejected':
+        db.notifications.insert_one({
+            'user_id': req_doc['customer_email'],
+            'message': f"Return Request Update: Your return request for {req_doc['appliance_name']} was rejected. Reason: {vendor_response or 'Policy requirements not met.'}",
+            'type': 'return_rejected',
+            'is_read': False,
+            'created_at': now_iso
+        })
+
+    updated_doc = db.return_requests.find_one({'request_id': request_id})
+    return jsonify(clean(updated_doc))
 
 # ─────────────────────────────────────────────
 # INVENTORY API
@@ -1332,12 +1727,69 @@ def add_review():
     return handle_create_review(app_id, data, user_email, user_role)
 
 # ─────────────────────────────────────────────
+# VENDOR LSTM DEMAND FORECASTING API
+# ─────────────────────────────────────────────
+
+@app.route('/api/vendor/forecast-appliances', methods=['GET', 'OPTIONS'])
+def get_vendor_forecast_appliances():
+    if db is None:
+        return jsonify({"error": "DB not connected"}), 500
+    user_email = (request.headers.get('X-User-Email') or request.args.get('email') or 'vendor@homerent.ai').strip().lower()
+    user_role = (request.headers.get('X-User-Role') or request.args.get('role') or 'vendor').strip().lower()
+    if user_role != 'vendor':
+        return jsonify({"error": "Forbidden: Vendor access required for forecasting console"}), 403
+    
+    data = get_vendor_appliances_and_counts(db, user_email)
+    return jsonify({"success": True, **data})
+
+@app.route('/api/vendor/demand-forecast', methods=['GET', 'POST', 'OPTIONS'])
+def get_demand_forecast():
+    if db is None:
+        return jsonify({"error": "DB not connected"}), 500
+    
+    if request.method == 'GET':
+        req_data = request.args.to_dict()
+    else:
+        req_data = request.get_json(silent=True) or {}
+
+    user_email = (request.headers.get('X-User-Email') or req_data.get('vendor_email') or req_data.get('email') or 'vendor@homerent.ai').strip().lower()
+    user_role = (request.headers.get('X-User-Role') or req_data.get('role') or 'vendor').strip().lower()
+    if user_role != 'vendor':
+        return jsonify({"error": "Forbidden: Vendor access required for forecasting console"}), 403
+
+    appliance_id = req_data.get('appliance_id')
+    category = req_data.get('category')
+    try:
+        horizon = int(req_data.get('horizon', 14))
+    except (ValueError, TypeError):
+        horizon = 14
+    interval = req_data.get('interval', 'daily')
+    force_retrain = str(req_data.get('force_retrain', False)).lower() in ('true', '1')
+
+    if horizon not in [7, 14, 30, 90]:
+        horizon = 14
+
+    result = generate_demand_forecast(
+        db,
+        vendor_email=user_email,
+        appliance_id=appliance_id,
+        category=category,
+        horizon=horizon,
+        interval=interval,
+        force_retrain=force_retrain
+    )
+
+    return jsonify(result)
+
+# ─────────────────────────────────────────────
 # STATIC FILE SERVING
 # ─────────────────────────────────────────────
 
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
 def serve(path):
+    if path.startswith('api/'):
+        return jsonify({"error": f"API endpoint not found: /{path}"}), 404
     if path == '':
         path = 'home.html'
     full_path = os.path.join(app.static_folder, path)

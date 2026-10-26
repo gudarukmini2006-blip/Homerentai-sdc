@@ -80,8 +80,136 @@
     <aside class="dashboard-sidebar glass-panel"><span class="dashboard-kicker">Workspace</span><nav aria-label="Dashboard navigation"><a href="dashboard.html" class="active">▦ <span>Overview</span></a><a href="appliances.html">⌂ <span>Appliances</span></a><a href="home.html#values">✦ <span>Recommendations</span></a><a href="#" id="sidebar-logout-link">↪ <span>Log Out</span></a></nav></aside>
       <section><div class="dashboard-heading"><div><span class="dashboard-kicker">Your rental workspace</span><h1>Good morning, Aarav.</h1><p>Review your rentals, savings, and next smart home upgrade in one place.</p></div><div class="dashboard-actions"><button id="open-service-modal-btn" class="btn-secondary" style="background: var(--bg-secondary); border: 1px solid var(--accent-gold); color: var(--accent-primary); font-weight: 700;">🛠️ Request Free Maintenance</button><a href="appliances.html" class="btn-primary">+ Rent an appliance</a></div></div>
       <div class="metric-grid"><article class="metric-card"><span class="metric-label">Active rentals</span><strong class="metric-value">2</strong><span class="metric-note">All services on track</span></article><article class="metric-card"><span class="metric-label">Monthly spend</span><strong class="metric-value">₹2,398</strong><span class="metric-note">12% below your plan</span></article><article class="metric-card"><span class="metric-label">Home savings</span><strong class="metric-value">₹8,420</strong><span class="metric-note">Compared with buying</span></article><article class="metric-card"><span class="metric-label">Energy score</span><strong class="metric-value">A+</strong><span class="metric-note">Excellent efficiency</span></article></div>
-      <div class="dashboard-grid"><div class="dashboard-panel"><div class="panel-heading"><h2>Your current rentals</h2><a href="appliances.html">Browse more</a></div><div class="rental-row"><img class="rental-thumb" src="assets/images/smart_refrigerator.jpg" alt="Smart refrigerator"><div><div class="rental-name">Smart Double-Door Refrigerator</div><div class="rental-meta">12 month plan · Renews 12 Jul 2027</div></div><span class="status-pill">Active</span><strong class="rental-price">₹1,299/mo</strong></div><div class="rental-row"><img class="rental-thumb" src="assets/images/washing_machine.jpg" alt="Washing machine"><div><div class="rental-name">Front Load Inverter Washing Machine</div><div class="rental-meta">6 month plan · Delivery scheduled</div></div><span class="status-pill pending">Pending</span><strong class="rental-price">₹1,099/mo</strong></div><div class="rental-row"><img class="rental-thumb" src="assets/images/air_purifier.jpg" alt="Air purifier"><div><div class="rental-name">Suggested next: HEPA Air Purifier</div><div class="rental-meta">Cleaner air for your living room</div></div><a href="appliances.html" class="panel-heading" style="margin:0">View</a></div></div><div><div class="insight-box"><h3>Your next smart move</h3><p>Adding an air purifier would improve your home's estimated air quality by 18% this season.</p><div class="progress-line"><span></span></div></div><div class="dashboard-panel"><div class="panel-heading"><h2>Rental mix</h2><span class="dashboard-kicker">This month</span></div><div class="category-list"><div class="category-item"><span>Kitchen</span><strong>52%</strong><div class="category-bar"><i style="width:52%"></i></div></div><div class="category-item"><span>Laundry</span><strong>28%</strong><div class="category-bar"><i style="width:28%"></i></div></div><div class="category-item"><span>Climate</span><strong>20%</strong><div class="category-bar"><i style="width:20%"></i></div></div></div></div></div></div>
+      <div class="dashboard-grid">
+        <div>
+          <!-- Current Rentals with Remaining Days & Return Eligibility -->
+          <div class="dashboard-panel" style="margin-bottom: 1.5rem;">
+            <div class="panel-heading">
+              <h2>Your Active Rentals</h2>
+              <a href="appliances.html">Browse Catalog</a>
+            </div>
+            <div id="customer-rentals-container">
+              <!-- Dynamically rendered from MongoDB bookings with COD status & Return Eligibility -->
+              <div class="rental-row">
+                <img class="rental-thumb" src="assets/images/smart_refrigerator.jpg" alt="Smart refrigerator">
+                <div>
+                  <div class="rental-name">Smart Double-Door Refrigerator</div>
+                  <div class="rental-meta">12 month plan • Renews 12 Jul 2027</div>
+                </div>
+                <span class="status-pill">Active</span>
+                <strong class="rental-price">₹1,299/mo</strong>
+              </div>
+            </div>
+          </div>
+
+          <!-- Early Return Requests Status Tracker -->
+          <div class="dashboard-panel" id="customer-returns-panel">
+            <div class="panel-heading">
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <span style="font-size: 1.2rem;">↩️</span>
+                <h2>Early Return Requests Tracker</h2>
+              </div>
+              <span id="returns-status-count" class="status-pill" style="font-size: 0.72rem;">0 Active Requests</span>
+            </div>
+            <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 1rem;">Track the status of appliance return requests submitted before your rental tenure expires.</p>
+            <div id="customer-returns-list" style="display: grid; gap: 0.8rem;">
+              <p style="font-size: 0.84rem; color: var(--text-secondary); text-align: center; padding: 1.5rem 0;">No early return requests submitted.</p>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="insight-box">
+            <h3>Your next smart move</h3>
+            <p>Adding an air purifier would improve your home's estimated air quality by 18% this season.</p>
+            <div class="progress-line"><span></span></div>
+          </div>
+          <div class="dashboard-panel">
+            <div class="panel-heading"><h2>Rental mix</h2><span class="dashboard-kicker">This month</span></div>
+            <div class="category-list">
+              <div class="category-item"><span>Kitchen</span><strong>52%</strong><div class="category-bar"><i style="width:52%"></i></div></div>
+              <div class="category-item"><span>Laundry</span><strong>28%</strong><div class="category-bar"><i style="width:28%"></i></div></div>
+              <div class="category-item"><span>Climate</span><strong>20%</strong><div class="category-bar"><i style="width:20%"></i></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
     </section>
+
+    <!-- Modal: Customer Early Return Request -->
+    <div id="return-request-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); z-index: 600; backdrop-filter: blur(8px); align-items: center; justify-content: center;">
+      <div style="background: var(--bg-secondary); border-radius: 20px; padding: 2rem; max-width: 500px; width: 90%; border: 1px solid var(--border-color); box-shadow: var(--shadow-lg);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem;">
+          <h3 class="font-serif" style="font-size: 1.4rem; color: var(--accent-primary); margin: 0;">↩️ Request Early Appliance Return</h3>
+          <button id="close-return-modal-btn" style="background: transparent; border: none; font-size: 1.6rem; color: var(--text-secondary); cursor: pointer;">&times;</button>
+        </div>
+        <div style="background: rgba(212, 163, 115, 0.15); border: 1px solid var(--accent-gold); border-radius: 12px; padding: 0.8rem 1rem; margin-bottom: 1.2rem; font-size: 0.82rem; color: var(--text-primary); line-height: 1.4;">
+          <strong>Return Policy Notice:</strong> Advance notice of at least <strong>3 days</strong> before rental tenure ends is required. Eligibility is evaluated using your official rental dates stored in MongoDB.
+        </div>
+        <form id="customer-return-form" style="display: flex; flex-direction: column; gap: 1rem;">
+          <input type="hidden" id="ret-booking-id" value="">
+          <div>
+            <label style="font-size: 0.78rem; font-weight: 700; text-transform: uppercase; color: var(--text-secondary);">Rented Appliance</label>
+            <input type="text" id="ret-appliance-display" class="form-input" readonly style="width: 100%; height: 42px; margin-top: 0.3rem; background: var(--bg-tertiary); font-weight: 600;">
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem;">
+            <div>
+              <label style="font-size: 0.78rem; font-weight: 700; text-transform: uppercase; color: var(--text-secondary);">Tenure End Date</label>
+              <input type="text" id="ret-end-date-display" class="form-input" readonly style="width: 100%; height: 42px; margin-top: 0.3rem; background: var(--bg-tertiary);">
+            </div>
+            <div>
+              <label style="font-size: 0.78rem; font-weight: 700; text-transform: uppercase; color: var(--text-secondary);">Remaining Days</label>
+              <input type="text" id="ret-remaining-display" class="form-input" readonly style="width: 100%; height: 42px; margin-top: 0.3rem; background: var(--bg-tertiary); font-weight: 700; color: var(--accent-primary);">
+            </div>
+          </div>
+          <div>
+            <label style="font-size: 0.78rem; font-weight: 700; text-transform: uppercase; color: var(--text-secondary);">Requested Pickup Date *</label>
+            <input type="date" id="ret-pickup-date" class="form-input" style="width: 100%; height: 42px; margin-top: 0.3rem;" required>
+          </div>
+          <div>
+            <label style="font-size: 0.78rem; font-weight: 700; text-transform: uppercase; color: var(--text-secondary);">Reason for Return *</label>
+            <select id="ret-reason-select" class="form-input" style="width: 100%; height: 42px; margin-top: 0.3rem;" required>
+              <option value="">-- Select Reason --</option>
+              <option value="Relocating to another city">Relocating to another city</option>
+              <option value="Moving to fully furnished apartment">Moving to fully furnished apartment</option>
+              <option value="Upgrading to larger / different appliance model">Upgrading to larger / different appliance model</option>
+              <option value="No longer requiring appliance">No longer requiring appliance</option>
+              <option value="Other / Personal reasons">Other / Personal reasons</option>
+            </select>
+          </div>
+          <div id="return-form-error" style="display: none; background: rgba(231, 76, 60, 0.12); border: 1px solid #e74c3c; color: #c0392b; padding: 0.6rem 0.8rem; border-radius: 8px; font-size: 0.8rem;"></div>
+          <div style="display: flex; gap: 0.8rem; justify-content: flex-end; margin-top: 0.5rem;">
+            <button type="button" id="cancel-return-btn" class="btn-secondary" style="padding: 0.6rem 1.2rem; font-size: 0.85rem;">Cancel</button>
+            <button type="submit" id="submit-return-btn" class="btn-primary" style="padding: 0.6rem 1.4rem; font-size: 0.85rem;">Submit Return Request</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal: Cash on Delivery Receipt Modal on Dashboard -->
+    <div id="dash-receipt-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); z-index: 600; backdrop-filter: blur(8px); align-items: center; justify-content: center; overflow-y: auto; padding: 1.5rem 0;">
+      <div style="background: var(--bg-secondary); border-radius: 20px; padding: 2rem; max-width: 620px; width: 92%; border: 1px solid var(--border-color); box-shadow: var(--shadow-lg); max-height: 90vh; overflow-y: auto;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem;">
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <span style="font-size: 1.5rem;">📜</span>
+            <h3 class="font-serif" style="font-size: 1.35rem; color: var(--accent-primary); margin: 0;">Cash on Delivery Rental Order Receipt</h3>
+          </div>
+          <button id="close-dash-receipt-btn" style="background: transparent; border: none; font-size: 1.6rem; color: var(--text-secondary); cursor: pointer;">&times;</button>
+        </div>
+        <div id="dash-receipt-card" style="border: 1.5px solid var(--border-color); border-radius: 14px; padding: 1.5rem; background: var(--bg-primary);">
+          <!-- Dynamically populated receipt content -->
+        </div>
+        <div style="display: flex; gap: 0.8rem; justify-content: flex-end; margin-top: 1.2rem;">
+          <button type="button" id="print-dash-receipt-btn" class="btn-secondary" style="padding: 0.6rem 1.2rem; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 0.4rem;">
+            <span>🖨️</span> Print Receipt
+          </button>
+          <button type="button" id="download-dash-receipt-btn" class="btn-primary" style="padding: 0.6rem 1.2rem; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 0.4rem;">
+            <span>📥</span> Download Receipt
+          </button>
+          <button type="button" id="close-dash-receipt-btn2" class="btn-secondary" style="padding: 0.6rem 1.2rem; font-size: 0.85rem;">Close</button>
+        </div>
+      </div>
+    </div>
 
     <!-- Maintenance Service Modal -->
     <div id="service-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); z-index: 500; backdrop-filter: blur(8px); align-items: center; justify-content: center;">
@@ -166,89 +294,432 @@
         `;
       }
 
-      // ─── Fetch bookings from MongoDB ───
-      try {
-        const [bookingsRes, revenueRes] = await Promise.all([
-          fetch('/api/bookings'),
-          fetch('/api/revenue')
-        ]);
+      // ─── Fetch bookings and return requests from MongoDB ───
+      let activeBookingsList = [];
+      let currentModalBooking = null;
 
-        const allBookings = await bookingsRes.json();
-        const allRevenue = await revenueRes.json();
-
-        // Filter bookings for this user
-        const myBookings = allBookings.filter(b =>
-          b.email === user.email || b.user_id === user.email
-        );
-
-        // ─── Update metrics ───
-        const activeCount = myBookings.filter(b => b.status === 'active').length;
-        const pendingCount = myBookings.filter(b => b.status === 'pending').length;
-        const totalSpend = myBookings
-          .filter(b => b.status === 'active' || b.status === 'pending')
-          .reduce((s, b) => s + (b.totalRent || b.total_amount || 0), 0);
-        const savings = Math.round(totalSpend * 28 * 0.9); // estimated savings vs buying
-
-        const metricCards = document.querySelectorAll('.metric-card');
-        if (metricCards[0]) {
-          metricCards[0].querySelector('.metric-value').textContent = activeCount + pendingCount;
-          metricCards[0].querySelector('.metric-note').textContent = activeCount + ' active, ' + pendingCount + ' pending';
+      function parseRentalDate(str) {
+        if (!str) return null;
+        const parts = str.trim().split(/[\/\-]/);
+        if (parts.length !== 3) return null;
+        if (parts[0].length === 4) {
+          // YYYY-MM-DD
+          return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+        } else {
+          // DD/MM/YYYY
+          return new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10));
         }
-        if (metricCards[1]) {
-          metricCards[1].querySelector('.metric-value').textContent = '₹' + Math.round(totalSpend).toLocaleString('en-IN');
-          metricCards[1].querySelector('.metric-note').textContent = myBookings.length + ' total rental(s)';
-        }
-        if (metricCards[2]) {
-          metricCards[2].querySelector('.metric-value').textContent = '₹' + savings.toLocaleString('en-IN');
-          metricCards[2].querySelector('.metric-note').textContent = 'Compared with buying';
-        }
-
-        // ─── Render bookings list ───
-        const rentalPanel = document.querySelector('.dashboard-panel');
-        if (rentalPanel && myBookings.length > 0) {
-          // Keep "Browse more" link and heading
-          const panelHeading = rentalPanel.querySelector('.panel-heading');
-          rentalPanel.innerHTML = '';
-          if (panelHeading) rentalPanel.appendChild(panelHeading);
-
-          // Image map
-          const imgMap = { kitchen:'assets/images/smart_refrigerator.jpg', laundry:'assets/images/washing_machine.jpg', climate:'assets/images/air_conditioner.jpg', living:'assets/images/air_purifier.jpg' };
-
-          myBookings.slice(0, 5).forEach(b => {
-            const statusClass = b.status === 'active' ? '' : b.status === 'completed' ? 'completed' : 'pending';
-            const statusLabel = b.status === 'active' ? 'Active' : b.status === 'completed' ? 'Completed' : 'Pending';
-            const img = imgMap[b.category] || 'assets/images/smart_refrigerator.jpg';
-            const row = document.createElement('div');
-            row.className = 'rental-row';
-            row.innerHTML = `
-              <img class="rental-thumb" src="${img}" alt="${b.applianceName}">
-              <div>
-                <div class="rental-name">${b.applianceName}</div>
-                <div class="rental-meta">${b.tenure || '3 month plan'} · Booked on ${b.date || b.start_date}</div>
-              </div>
-              <span class="status-pill ${statusClass}">${statusLabel}</span>
-              <strong class="rental-price">₹${Math.round(b.totalRent || b.total_amount || 0).toLocaleString('en-IN')}/mo</strong>
-            `;
-            rentalPanel.appendChild(row);
-          });
-
-          // Suggested next
-          const suggestRow = document.createElement('div');
-          suggestRow.className = 'rental-row';
-          suggestRow.innerHTML = `
-            <img class="rental-thumb" src="assets/images/air_purifier.jpg" alt="Air purifier">
-            <div>
-              <div class="rental-name">Suggested next: HEPA Air Purifier</div>
-              <div class="rental-meta">Cleaner air for your living room</div>
-            </div>
-            <a href="appliances.html" class="panel-heading" style="margin:0">View</a>
-          `;
-          rentalPanel.appendChild(suggestRow);
-        }
-
-      } catch(err) {
-        console.log('Dashboard: using static data (DB unavailable)');
       }
+
+      function calculateRemainingDays(endDateStr) {
+        const endDt = parseRentalDate(endDateStr);
+        if (!endDt || isNaN(endDt.getTime())) return null;
+        const now = new Date();
+        now.setHours(0,0,0,0);
+        endDt.setHours(0,0,0,0);
+        return Math.ceil((endDt - now) / (1000 * 60 * 60 * 24));
+      }
+
+      async function loadDashboardData() {
+        try {
+          const [bookingsRes, revenueRes, returnsRes] = await Promise.all([
+            fetch('/api/bookings'),
+            fetch('/api/revenue'),
+            fetch(`/api/return-requests?role=customer&email=${encodeURIComponent(user.email)}`)
+          ]);
+
+          const allBookings = await bookingsRes.json();
+          const returnRequests = returnsRes.ok ? await returnsRes.json() : [];
+
+          // Scoped bookings for this user
+          const myBookings = allBookings.filter(b =>
+            (b.email || b.user_id || '').toLowerCase() === user.email.toLowerCase()
+          );
+          activeBookingsList = myBookings;
+
+          // ─── Update metrics ───
+          const activeCount = myBookings.filter(b => b.status === 'active' || b.status === 'confirmed').length;
+          const pendingCount = myBookings.filter(b => b.status === 'pending').length;
+          const totalSpend = myBookings
+            .filter(b => b.status === 'active' || b.status === 'pending' || b.status === 'confirmed')
+            .reduce((s, b) => s + (b.totalRent || b.total_amount || 0), 0);
+          const savings = Math.round(totalSpend * 28 * 0.9);
+
+          const metricCards = document.querySelectorAll('.metric-card');
+          if (metricCards[0]) {
+            metricCards[0].querySelector('.metric-value').textContent = activeCount + pendingCount;
+            metricCards[0].querySelector('.metric-note').textContent = `${activeCount} active, ${pendingCount} pending setup`;
+          }
+          if (metricCards[1]) {
+            metricCards[1].querySelector('.metric-value').textContent = '₹' + Math.round(totalSpend).toLocaleString('en-IN');
+            metricCards[1].querySelector('.metric-note').textContent = `${myBookings.length} total rental booking(s)`;
+          }
+          if (metricCards[2]) {
+            metricCards[2].querySelector('.metric-value').textContent = '₹' + savings.toLocaleString('en-IN');
+            metricCards[2].querySelector('.metric-note').textContent = 'Compared with buying new appliances';
+          }
+
+          // ─── Render Active Rentals ───
+          const rentalsContainer = document.getElementById('customer-rentals-container');
+          if (rentalsContainer) {
+            rentalsContainer.innerHTML = '';
+            if (myBookings.length === 0) {
+              rentalsContainer.innerHTML = `<p style="text-align:center; color:var(--text-secondary); padding:2rem;">You do not have any active rental bookings yet.</p>`;
+            } else {
+              const imgMap = {
+                kitchen: 'assets/images/smart_refrigerator.jpg',
+                laundry: 'assets/images/washing_machine.jpg',
+                climate: 'assets/images/air_conditioner.jpg',
+                living: 'assets/images/air_purifier.jpg'
+              };
+
+              myBookings.forEach(b => {
+                const img = imgMap[b.category] || 'assets/images/smart_refrigerator.jpg';
+                const remaining = calculateRemainingDays(b.end_date);
+                const isPaid = b.payment_status === 'paid';
+                const codBadge = isPaid
+                  ? `<span style="background:rgba(46,204,113,0.15); color:#27ae60; font-weight:700; padding:0.2rem 0.6rem; border-radius:12px; font-size:0.75rem; border:1px solid rgba(46,204,113,0.3);">✅ COD: Paid</span>`
+                  : `<span style="background:rgba(197,160,89,0.18); color:var(--accent-gold); font-weight:700; padding:0.2rem 0.6rem; border-radius:12px; font-size:0.75rem; border:1px solid rgba(197,160,89,0.4);">⏳ COD: Pending (Pay on Delivery)</span>`;
+
+                // Return Eligibility calculation: Notice policy requires >= 3 days
+                let eligibilityBadge = '';
+                let canRequestReturn = false;
+                const hasPendingReturn = returnRequests.some(r => r.booking_id === b.id && ['pending', 'accepted', 'pickup_scheduled'].includes(r.status));
+
+                if (b.status === 'completed' || b.status === 'returned') {
+                  eligibilityBadge = `<span style="color:var(--text-secondary); font-size:0.75rem;">Rental Completed</span>`;
+                } else if (hasPendingReturn) {
+                  eligibilityBadge = `<span style="color:#e67e22; font-weight:700; font-size:0.75rem;">Return Request in Progress</span>`;
+                } else if (remaining !== null) {
+                  if (remaining >= 3) {
+                    eligibilityBadge = `<span style="color:#27ae60; font-weight:600; font-size:0.75rem;">Eligible for Return (${remaining} days left • 3-day notice met)</span>`;
+                    canRequestReturn = true;
+                  } else if (remaining >= 0) {
+                    eligibilityBadge = `<span style="color:#e74c3c; font-weight:600; font-size:0.75rem;">Outside 3-day notice policy (${remaining} days remaining)</span>`;
+                  } else {
+                    eligibilityBadge = `<span style="color:#e74c3c; font-size:0.75rem;">Tenure expired on ${b.end_date}</span>`;
+                  }
+                }
+
+                const card = document.createElement('div');
+                card.style.cssText = 'border-bottom: 1px solid var(--border-color); padding: 1.1rem 0; display: flex; flex-direction: column; gap: 0.6rem;';
+                card.innerHTML = `
+                  <div style="display: flex; gap: 1rem; align-items: center; justify-content: space-between; flex-wrap: wrap;">
+                    <div style="display: flex; gap: 0.9rem; align-items: center;">
+                      <img src="${img}" alt="${b.applianceName}" style="width: 58px; height: 58px; border-radius: 12px; object-fit: cover; background: var(--bg-tertiary);">
+                      <div>
+                        <div style="font-weight: 700; font-size: 0.95rem; color: var(--accent-primary);">${b.applianceName}</div>
+                        <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.15rem;">
+                          Booking ID: <strong style="font-family:monospace; color:var(--text-primary);">${b.id}</strong> • ${b.tenure || '3 Months'}
+                        </div>
+                        <div style="font-size: 0.76rem; color: var(--text-secondary); margin-top: 0.1rem;">
+                          Tenure: <strong>${b.start_date || 'N/A'}</strong> to <strong>${b.end_date || 'N/A'}</strong>
+                        </div>
+                      </div>
+                    </div>
+                    <div style="text-align: right;">
+                      <div style="font-size: 1.05rem; font-weight: 800; color: var(--accent-primary);">₹${Math.round(b.totalRent || b.total_amount || 0).toLocaleString('en-IN')}/mo</div>
+                      <div style="margin-top: 0.3rem;">${codBadge}</div>
+                    </div>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.6rem; background: var(--bg-tertiary); padding: 0.6rem 0.8rem; border-radius: 10px; margin-top: 0.2rem;">
+                    <div>${eligibilityBadge}</div>
+                    <div style="display: flex; gap: 0.5rem;">
+                      <button type="button" class="btn-view-cod-receipt btn-secondary" data-booking-id="${b.id}" style="padding: 0.4rem 0.8rem; font-size: 0.75rem; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.3rem;">
+                        <span>📄</span> View COD Receipt
+                      </button>
+                      ${canRequestReturn ? `
+                        <button type="button" class="btn-open-return-modal btn-primary" data-booking-id="${b.id}" style="padding: 0.4rem 0.8rem; font-size: 0.75rem; border-radius: 8px; background: #e74c3c; border: none; color: white; cursor: pointer; display: inline-flex; align-items: center; gap: 0.3rem;">
+                          <span>↩️</span> Request Early Return
+                        </button>
+                      ` : ''}
+                    </div>
+                  </div>
+                `;
+                rentalsContainer.appendChild(card);
+              });
+
+              // Attach click listeners for View Receipt
+              rentalsContainer.querySelectorAll('.btn-view-cod-receipt').forEach(btn => {
+                btn.addEventListener('click', () => {
+                  const bId = btn.getAttribute('data-booking-id');
+                  const bk = activeBookingsList.find(x => x.id === bId);
+                  if (bk) showDashReceiptModal(bk);
+                });
+              });
+
+              // Attach click listeners for Request Return
+              rentalsContainer.querySelectorAll('.btn-open-return-modal').forEach(btn => {
+                btn.addEventListener('click', () => {
+                  const bId = btn.getAttribute('data-booking-id');
+                  const bk = activeBookingsList.find(x => x.id === bId);
+                  if (bk) openReturnRequestModal(bk);
+                });
+              });
+            }
+          }
+
+          // ─── Render Return Requests Tracker ───
+          const returnsContainer = document.getElementById('customer-returns-list');
+          const returnsCounter = document.getElementById('returns-status-count');
+          if (returnsContainer && returnsCounter) {
+            returnsCounter.textContent = `${returnRequests.length} Request(s) Recorded`;
+            returnsContainer.innerHTML = '';
+            if (returnRequests.length === 0) {
+              returnsContainer.innerHTML = `<p style="font-size:0.84rem; color:var(--text-secondary); text-align:center; padding:1.2rem 0;">No early return requests submitted.</p>`;
+            } else {
+              returnRequests.forEach(r => {
+                let statusColor = '#f39c12';
+                let statusText = 'Pending Review';
+                if (r.status === 'accepted') { statusColor = '#27ae60'; statusText = 'Accepted by Vendor'; }
+                else if (r.status === 'pickup_scheduled') { statusColor = '#2980b9'; statusText = 'Pickup Scheduled'; }
+                else if (r.status === 'returned' || r.status === 'closed') { statusColor = '#27ae60'; statusText = 'Returned & Completed'; }
+                else if (r.status === 'rejected') { statusColor = '#c0392b'; statusText = 'Request Rejected'; }
+
+                const row = document.createElement('div');
+                row.style.cssText = 'background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 12px; padding: 0.9rem 1rem;';
+                row.innerHTML = `
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.4rem; flex-wrap:wrap; gap:0.4rem;">
+                    <div>
+                      <strong style="color:var(--accent-primary); font-size:0.9rem;">${r.appliance_name}</strong>
+                      <span style="font-family:monospace; color:var(--text-secondary); font-size:0.75rem; margin-left:0.5rem;">${r.request_id}</span>
+                    </div>
+                    <span style="background:${statusColor}22; color:${statusColor}; border:1px solid ${statusColor}44; padding:0.2rem 0.65rem; border-radius:12px; font-weight:700; font-size:0.75rem;">
+                      ${statusText}
+                    </span>
+                  </div>
+                  <div style="font-size:0.78rem; color:var(--text-secondary); display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:0.3rem;">
+                    <div>Booking ID: <strong style="color:var(--text-primary);">${r.booking_id}</strong></div>
+                    <div>Requested Pickup: <strong style="color:var(--text-primary);">${r.requested_pickup_date}</strong></div>
+                    <div>Remaining Days at Request: <strong>${r.remaining_days_at_request} days</strong></div>
+                    <div>Reason: <em>"${r.reason}"</em></div>
+                  </div>
+                  ${(r.vendor_response || r.vendor_note) ? `
+                    <div style="margin-top:0.5rem; padding-top:0.4rem; border-top:1px dashed var(--border-color); font-size:0.76rem; color:var(--text-primary);">
+                      💬 <strong>Vendor Response:</strong> ${r.vendor_response || r.vendor_note}
+                      ${(r.confirmed_pickup_date || r.scheduled_pickup_date) ? ` • <strong>Pickup Confirmed:</strong> ${r.confirmed_pickup_date || r.scheduled_pickup_date}` : ''}
+                    </div>
+                  ` : ''}
+                `;
+                returnsContainer.appendChild(row);
+              });
+            }
+          }
+
+        } catch (err) {
+          console.error("Dashboard data load error:", err);
+        }
+      }
+
+      // ─── Modal Handlers ───
+      const returnModal = document.getElementById('return-request-modal');
+      const closeReturnBtn = document.getElementById('close-return-modal-btn');
+      const cancelReturnBtn = document.getElementById('cancel-return-btn');
+      const returnForm = document.getElementById('customer-return-form');
+      const returnError = document.getElementById('return-form-error');
+
+      function openReturnRequestModal(booking) {
+        currentModalBooking = booking;
+        document.getElementById('ret-booking-id').value = booking.id;
+        document.getElementById('ret-appliance-display').value = booking.applianceName || booking.appliance_name || 'Appliance';
+        document.getElementById('ret-end-date-display').value = booking.end_date || 'N/A';
+        const rem = calculateRemainingDays(booking.end_date);
+        document.getElementById('ret-remaining-display').value = rem !== null ? `${rem} Days` : 'N/A';
+
+        // Suggest pickup date as tomorrow
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        document.getElementById('ret-pickup-date').min = tomorrow.toISOString().split('T')[0];
+        document.getElementById('ret-pickup-date').value = tomorrow.toISOString().split('T')[0];
+
+        returnError.style.display = 'none';
+        returnModal.style.display = 'flex';
+      }
+
+      if (closeReturnBtn) closeReturnBtn.onclick = () => returnModal.style.display = 'none';
+      if (cancelReturnBtn) cancelReturnBtn.onclick = () => returnModal.style.display = 'none';
+
+      if (returnForm) {
+        returnForm.onsubmit = async (e) => {
+          e.preventDefault();
+          returnError.style.display = 'none';
+          const bookingId = document.getElementById('ret-booking-id').value;
+          const pickupDate = document.getElementById('ret-pickup-date').value;
+          const reason = document.getElementById('ret-reason-select').value;
+
+          try {
+            const res = await fetch('/api/return-requests', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-User-Email': user.email,
+                'X-User-Role': 'customer'
+              },
+              body: JSON.stringify({
+                booking_id: bookingId,
+                customer_email: user.email,
+                requested_pickup_date: pickupDate,
+                reason: reason
+              })
+            });
+
+            const data = await res.json();
+            if (!res.ok) {
+              returnError.textContent = data.error || 'Failed to submit return request.';
+              returnError.style.display = 'block';
+              return;
+            }
+
+            alert(`Return Request ${data.request_id} submitted successfully! The vendor has been notified.`);
+            returnModal.style.display = 'none';
+            returnForm.reset();
+            loadDashboardData();
+          } catch (err) {
+            returnError.textContent = 'Network error while submitting request. Please try again.';
+            returnError.style.display = 'block';
+          }
+        };
+      }
+
+      // ─── COD Receipt Modal Handlers ───
+      const dashReceiptModal = document.getElementById('dash-receipt-modal');
+      const closeReceiptBtn = document.getElementById('close-dash-receipt-btn');
+      const closeReceiptBtn2 = document.getElementById('close-dash-receipt-btn2');
+      const printReceiptBtn = document.getElementById('print-dash-receipt-btn');
+      const downloadReceiptBtn = document.getElementById('download-dash-receipt-btn');
+      let receiptBookingObj = null;
+
+      function showDashReceiptModal(b) {
+        receiptBookingObj = b;
+        const card = document.getElementById('dash-receipt-card');
+        const monthly = Math.round(b.monthly_price || b.monthlyRent || (b.totalRent / (b.tenure_months || 1)) || 0);
+        const total = Math.round(b.total_amount || b.totalRent || (monthly * (b.tenure_months || 1)) || 0);
+        const isPaid = b.payment_status === 'paid';
+
+        card.innerHTML = `
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid var(--border-color); padding-bottom:0.8rem; margin-bottom:1rem; flex-wrap:wrap; gap:0.6rem;">
+            <div>
+              <div style="font-size:1.3rem; font-weight:800; color:var(--accent-primary);">HomeRent AI</div>
+              <div style="font-size:0.76rem; color:var(--text-secondary);">Household Appliance Rental Management System</div>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-size:0.72rem; text-transform:uppercase; color:var(--text-secondary);">Receipt No.</div>
+              <div style="font-family:monospace; font-size:0.95rem; font-weight:800; color:var(--accent-gold);">${b.receipt_number || 'REC-COD-' + b.id}</div>
+            </div>
+          </div>
+
+          <div style="background:linear-gradient(135deg, rgba(212,163,115,0.18), rgba(46,204,113,0.15)); border:1.5px solid var(--accent-gold); border-radius:10px; padding:0.8rem; margin-bottom:1rem; text-align:center;">
+            <div style="font-size:0.9rem; font-weight:800; color:var(--accent-primary);">
+              💵 Please pay the total amount in cash when the appliance is delivered.
+            </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.6rem; font-size:0.82rem; margin-bottom:0.8rem;">
+            <div>Customer: <strong>${b.customerName || b.customer_name || user.name}</strong></div>
+            <div>Booking ID: <strong style="font-family:monospace;">${b.id}</strong></div>
+            <div>Customer Email: <strong>${b.email || user.email}</strong></div>
+            <div>Booking Date: <strong>${b.date || b.start_date || 'N/A'}</strong></div>
+            <div style="grid-column:span 2;">Delivery Address: <strong>${b.address || 'Indiranagar, Bengaluru, Karnataka'}</strong></div>
+          </div>
+
+          <div style="border-top:1px dashed var(--border-color); border-bottom:1px dashed var(--border-color); padding:0.8rem 0; margin:0.8rem 0; font-size:0.82rem;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:0.3rem;">
+              <span>Appliance:</span><strong>${b.applianceName} (Qty: 1)</strong>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:0.3rem;">
+              <span>Category / Tenure:</span><span>${(b.category || 'Kitchen').toUpperCase()} • ${b.tenure || '3 Months'}</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:0.3rem;">
+              <span>Tenure Period:</span><span>${b.start_date || 'N/A'} to ${b.end_date || 'N/A'}</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:0.3rem;">
+              <span>Monthly Rate:</span><span>₹${monthly.toLocaleString('en-IN')}/mo</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:0.3rem;">
+              <span>Delivery &amp; Installation:</span><strong style="color:#27ae60;">FREE (₹0)</strong>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:0.3rem;">
+              <span>Payment Method:</span><strong>Cash on Delivery (COD)</strong>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:0.3rem;">
+              <span>Payment Status:</span>
+              <strong style="color:${isPaid ? '#27ae60' : '#e67e22'};">${isPaid ? 'Paid' : 'Pending / Pay on Delivery'}</strong>
+            </div>
+          </div>
+
+          <div style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-tertiary); padding:0.6rem 0.8rem; border-radius:8px;">
+            <strong style="font-size:0.95rem;">Total Amount Payable on Delivery:</strong>
+            <strong style="font-size:1.2rem; color:var(--accent-primary);">₹${total.toLocaleString('en-IN')}</strong>
+          </div>
+
+          <div style="margin-top:0.8rem; font-size:0.75rem; color:var(--text-secondary); text-align:center;">
+            Vendor: ${b.vendor_name || 'HomeRent Verified Vendor'} • Phone: ${b.vendor_phone || '9876543210'}
+          </div>
+        `;
+
+        dashReceiptModal.style.display = 'flex';
+      }
+
+      if (closeReceiptBtn) closeReceiptBtn.onclick = () => dashReceiptModal.style.display = 'none';
+      if (closeReceiptBtn2) closeReceiptBtn2.onclick = () => dashReceiptModal.style.display = 'none';
+      if (printReceiptBtn) printReceiptBtn.onclick = () => window.print();
+
+      if (downloadReceiptBtn) {
+        downloadReceiptBtn.onclick = () => {
+          if (!receiptBookingObj) return;
+          const b = receiptBookingObj;
+          const monthly = Math.round(b.monthly_price || b.monthlyRent || (b.totalRent / (b.tenure_months || 1)) || 0);
+          const total = Math.round(b.total_amount || b.totalRent || (monthly * (b.tenure_months || 1)) || 0);
+          const text = `============================================================
+              HOMERENT AI - CASH ON DELIVERY RECEIPT
+          Household Appliance Rental Management System
+============================================================
+RECEIPT NUMBER:       ${b.receipt_number || 'REC-COD-' + b.id}
+BOOKING / RENTAL ID:  ${b.id}
+BOOKING DATE:         ${b.date || b.start_date || 'N/A'}
+ORDER STATUS:         ${(b.status || 'Confirmed').toUpperCase()}
+
+CUSTOMER DETAILS:
+Customer Name:        ${b.customerName || b.customer_name || user.name}
+Customer Email:       ${b.email || user.email}
+Delivery Address:     ${b.address || 'Indiranagar, Bengaluru, Karnataka'}
+
+APPLIANCE & RENTAL SPECIFICATIONS:
+Appliance Name:       ${b.applianceName}
+Category:             ${(b.category || 'Kitchen').toUpperCase()}
+Quantity:             1 Unit
+Selected Tenure:      ${b.tenure || '3 Months'}
+Rental Start Date:    ${b.start_date || 'N/A'}
+Rental End Date:      ${b.end_date || 'N/A'}
+
+ITEMIZED CHARGES:
+Monthly Rental Rate:  ₹${monthly.toLocaleString('en-IN')} / month
+Delivery & Setup:     FREE (₹0)
+Security Deposit:     ₹0 (No Deposit Required)
+Applicable Taxes:     Included in Rental Price
+Payment Method:       Cash on Delivery (COD)
+Payment Status:       ${b.payment_status === 'paid' ? 'Paid' : 'Pending / Pay on Delivery'}
+
+FINAL TOTAL PAYABLE IN CASH: ₹${total.toLocaleString('en-IN')}
+
+NOTICE:
+Please pay the total amount in cash when the appliance is delivered.
+
+AUTHORIZED VENDOR:
+Vendor Name:          ${b.vendor_name || 'HomeRent Verified Vendor'}
+Vendor Phone:         ${b.vendor_phone || '9876543210'}
+============================================================`;
+          const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `HomeRent_COD_Receipt_${b.id}.txt`;
+          a.click();
+          URL.revokeObjectURL(url);
+        };
+      }
+
+      loadDashboardData();
     })();
   </script>
 </body>

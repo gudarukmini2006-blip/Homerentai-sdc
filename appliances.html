@@ -255,7 +255,6 @@
       }
     }
   </style>
-  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 </head>
 <body>
 
@@ -486,6 +485,9 @@
         <div class="filter-tabs" id="admin-tabs">
           <button class="filter-tab active" data-admin-tab="inventory">Manage Inventory</button>
           <button class="filter-tab" data-admin-tab="bookings">Active Bookings</button>
+          <button class="filter-tab" data-admin-tab="returns">Return Requests <span id="vendor-return-badge" style="background:#e74c3c;color:#fff;border-radius:10px;padding:2px 7px;font-size:0.75rem;margin-left:4px;display:none;">0</span></button>
+          <button class="filter-tab" data-admin-tab="categories">Category Management</button>
+          <button class="filter-tab" data-admin-tab="forecast">AI Demand Forecast</button>
         </div>
       </div>
 
@@ -587,6 +589,204 @@
           <div class="bookings-list" id="admin-bookings-list">
             <!-- Active customer booking cards render here dynamically -->
           </div>
+        </div>
+      </div>
+
+      <!-- TAB 3: RETURN REQUESTS MANAGEMENT -->
+      <div class="admin-content-section" id="admin-returns-section">
+        <div class="glass-panel" style="padding: 2rem; border-radius: 20px; margin-bottom: 2rem;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem;">
+            <div>
+              <div style="display: inline-flex; align-items: center; gap: 0.5rem; background: rgba(231, 76, 60, 0.12); border: 1px solid rgba(231, 76, 60, 0.4); padding: 0.35rem 0.85rem; border-radius: 20px; font-size: 0.78rem; font-weight: 700; color: #c0392b; margin-bottom: 0.5rem;">
+                <span>↩️ Early Return Request Desk</span>
+                <span style="opacity: 0.5;">|</span>
+                <span id="returns-pending-counter">0 Pending Review</span>
+              </div>
+              <h3 class="font-serif" style="font-size: 1.6rem; color: var(--accent-primary); margin: 0 0 0.35rem 0;">Appliance Return Requests</h3>
+              <p style="color: var(--text-secondary); font-size: 0.88rem; margin: 0;">Review customer requests to return appliances before their rental tenure ends. Accept with pickup schedules or reject with reason notes.</p>
+            </div>
+            <button id="refresh-returns-btn" class="btn-secondary" style="padding: 0.65rem 1.2rem; font-size: 0.85rem; border-radius: 12px; display: inline-flex; align-items: center; gap: 0.4rem; cursor: pointer;">
+              <span>🔄</span> Refresh Requests
+            </button>
+          </div>
+
+          <div id="vendor-returns-list" style="display: grid; gap: 1rem;">
+            <!-- Return requests populated here dynamically -->
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 4: DYNAMIC CATEGORY MANAGEMENT -->
+      <div class="admin-content-section" id="admin-categories-section">
+        <div class="glass-panel" style="padding: 2rem; border-radius: 20px; margin-bottom: 2rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem;">
+            <div>
+              <h3 class="font-serif" style="font-size: 1.6rem; color: var(--accent-primary); margin: 0 0 0.35rem 0;">Appliance Category Management</h3>
+              <p style="color: var(--text-secondary); font-size: 0.88rem; margin: 0;">Create, edit, activate/deactivate, and delete catalog categories dynamically in MongoDB.</p>
+            </div>
+            <button id="open-add-category-modal-btn" class="btn-primary" style="padding: 0.75rem 1.4rem; font-size: 0.88rem; font-weight: 700; border-radius: 12px; display: inline-flex; align-items: center; gap: 0.4rem; cursor: pointer;">
+              <span>➕ Add New Category</span>
+            </button>
+          </div>
+
+          <div id="vendor-categories-table-wrap" style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 0.88rem; text-align: left;">
+              <thead>
+                <tr style="border-bottom: 2px solid var(--border-color); color: var(--text-secondary);">
+                  <th style="padding: 0.85rem 1rem;">Category</th>
+                  <th style="padding: 0.85rem 1rem;">Identifier (Slug)</th>
+                  <th style="padding: 0.85rem 1rem;">Description</th>
+                  <th style="padding: 0.85rem 1rem; text-align: center;">Appliances</th>
+                  <th style="padding: 0.85rem 1rem; text-align: center;">Status</th>
+                  <th style="padding: 0.85rem 1rem; text-align: right;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="vendor-categories-tbody">
+                <!-- Dynamically populated from /api/categories -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 5: AI DEMAND FORECAST (LSTM Deep Learning Module) -->
+      <div class="admin-content-section" id="admin-forecast-section">
+        <div class="glass-panel" style="padding: 2rem; border-radius: 20px; margin-bottom: 2rem;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem;">
+            <div>
+              <div style="display: inline-flex; align-items: center; gap: 0.5rem; background: rgba(212, 163, 115, 0.15); border: 1px solid var(--accent-gold); padding: 0.35rem 0.85rem; border-radius: 20px; font-size: 0.78rem; font-weight: 700; color: var(--accent-primary); margin-bottom: 0.5rem;">
+                <span>🧠 TensorFlow Keras LSTM Engine</span>
+                <span style="opacity: 0.5;">|</span>
+                <span>MongoDB Historical Pipeline</span>
+              </div>
+              <h3 class="font-serif" style="font-size: 1.6rem; color: var(--accent-primary); margin: 0 0 0.35rem 0;">Appliance Rental Demand Forecasting</h3>
+              <p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0;">Predict future rental demand curves using a genuine LSTM recurrent neural network trained exclusively on your verified MongoDB booking records.</p>
+            </div>
+            <div style="display: flex; gap: 0.75rem; align-items: center;">
+              <button id="forecast-retrain-btn" class="btn-secondary" style="padding: 0.7rem 1.25rem; font-size: 0.85rem; border-radius: 12px; display: inline-flex; align-items: center; gap: 0.4rem; cursor: pointer;">
+                <span>🔄 Force Retrain Model</span>
+              </button>
+              <button id="forecast-run-btn" class="btn-primary" style="padding: 0.7rem 1.5rem; font-size: 0.85rem; border-radius: 12px; display: inline-flex; align-items: center; gap: 0.4rem; cursor: pointer; background: var(--accent-primary); color: white;">
+                <span>⚡ Run Forecast</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Controls Bar -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; background: var(--bg-primary); padding: 1.25rem; border-radius: 14px; border: 1px solid var(--border-color); margin-bottom: 1.5rem;">
+            <div>
+              <label for="forecast-scope-select" style="display: block; font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary); margin-bottom: 0.4rem;">Target Appliance / Scope</label>
+              <select id="forecast-scope-select" class="form-input" style="height: 44px; width: 100%; border-radius: 10px; background: var(--card-bg);">
+                <option value="all">Entire Fleet (All Appliances)</option>
+                <optgroup label="Categories" id="forecast-category-group">
+                  <option value="cat:kitchen">Kitchen Category</option>
+                  <option value="cat:laundry">Laundry Category</option>
+                  <option value="cat:climate">Climate Control Category</option>
+                  <option value="cat:living">Smart Living Category</option>
+                </optgroup>
+                <optgroup label="Individual Appliances" id="forecast-appliance-group">
+                </optgroup>
+              </select>
+            </div>
+            <div>
+              <label for="forecast-horizon-select" style="display: block; font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary); margin-bottom: 0.4rem;">Forecasting Horizon</label>
+              <select id="forecast-horizon-select" class="form-input" style="height: 44px; width: 100%; border-radius: 10px; background: var(--card-bg);">
+                <option value="7">Next 7 Days (Short-term)</option>
+                <option value="14" selected>Next 14 Days (Standard)</option>
+                <option value="30">Next 30 Days (1 Month)</option>
+                <option value="90">Next 90 Days (~3 Months)</option>
+              </select>
+            </div>
+            <div>
+              <label for="forecast-interval-select" style="display: block; font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary); margin-bottom: 0.4rem;">Aggregation Granularity</label>
+              <select id="forecast-interval-select" class="form-input" style="height: 44px; width: 100%; border-radius: 10px; background: var(--card-bg);">
+                <option value="daily" selected>Daily Aggregation</option>
+                <option value="weekly">Weekly Aggregation</option>
+                <option value="monthly">Monthly Aggregation</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Metrics Row -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+            <div class="glass-panel" style="padding: 1.25rem; border-radius: 14px; border: 1px solid var(--border-color);">
+              <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary);">Forecast Data Basis</div>
+              <div id="metric-data-status" style="font-size: 1.05rem; font-weight: 700; color: var(--accent-primary); margin-top: 0.35rem;">--</div>
+              <div id="metric-historical-count" style="font-size: 0.73rem; color: var(--text-secondary); margin-top: 0.25rem;">0 historical records analyzed</div>
+            </div>
+            <div class="glass-panel" style="padding: 1.25rem; border-radius: 14px; border: 1px solid var(--border-color);">
+              <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary);">Model Architecture</div>
+              <div id="metric-model-arch" style="font-size: 1.05rem; font-weight: 700; color: var(--accent-primary); margin-top: 0.35rem;">LSTM (2-layer + Dense)</div>
+              <div id="metric-epochs-status" style="font-size: 0.73rem; color: var(--text-secondary); margin-top: 0.25rem;">Adam optimizer • MSE loss</div>
+            </div>
+            <div class="glass-panel" style="padding: 1.25rem; border-radius: 14px; border: 1px solid var(--border-color);">
+              <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary);">Model MAE (Mean Abs Error)</div>
+              <div id="metric-mae-val" style="font-size: 1.05rem; font-weight: 700; color: var(--accent-primary); margin-top: 0.35rem;">--</div>
+              <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">Average error magnitude</div>
+            </div>
+            <div class="glass-panel" style="padding: 1.25rem; border-radius: 14px; border: 1px solid var(--border-color);">
+              <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary);">Model RMSE</div>
+              <div id="metric-rmse-val" style="font-size: 1.05rem; font-weight: 700; color: var(--accent-primary); margin-top: 0.35rem;">--</div>
+              <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">Root mean squared error</div>
+            </div>
+            <div class="glass-panel" style="padding: 1.25rem; border-radius: 14px; border: 1px solid var(--border-color);">
+              <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary);">Seasonality Detection</div>
+              <div id="metric-seasonality-badge" style="font-size: 1.05rem; font-weight: 700; color: var(--accent-primary); margin-top: 0.35rem;">--</div>
+              <div id="metric-seasonality-desc" style="font-size: 0.73rem; color: var(--text-secondary); margin-top: 0.25rem;">Derived strictly from records</div>
+            </div>
+          </div>
+
+          <!-- Chart Area -->
+          <div class="glass-panel" style="padding: 1.5rem; border-radius: 16px; margin-bottom: 2rem; border: 1px solid var(--border-color); background: var(--bg-primary);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.75rem;">
+              <h4 class="font-serif" style="margin: 0; font-size: 1.15rem; color: var(--accent-primary);">Time-Series Demand Curve: Historical vs LSTM Prediction</h4>
+              <div style="display: flex; gap: 1rem; font-size: 0.8rem; align-items: center; flex-wrap: wrap;">
+                <span style="display: inline-flex; align-items: center; gap: 0.4rem;">
+                  <span style="display: inline-block; width: 14px; height: 3px; background: #2563eb; border-radius: 2px;"></span>
+                  <span>Historical Demand (MongoDB)</span>
+                </span>
+                <span style="display: inline-flex; align-items: center; gap: 0.4rem;">
+                  <span style="display: inline-block; width: 14px; height: 3px; background: #f59e0b; border-bottom: 2px dashed #f59e0b;"></span>
+                  <span>LSTM Forecast</span>
+                </span>
+                <span style="display: inline-flex; align-items: center; gap: 0.4rem;">
+                  <span style="display: inline-block; width: 2px; height: 12px; background: #dc2626;"></span>
+                  <span>Forecast Boundary</span>
+                </span>
+              </div>
+            </div>
+            
+            <div id="forecast-chart-container" style="width: 100%; min-height: 320px; position: relative;">
+              <!-- Dynamic SVG Chart renders here -->
+            </div>
+          </div>
+
+          <!-- Future Predictions Breakdown Table -->
+          <div class="glass-panel" style="padding: 1.5rem; border-radius: 16px; border: 1px solid var(--border-color);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+              <h4 class="font-serif" style="margin: 0; font-size: 1.15rem; color: var(--accent-primary);">Projected Rental Demand Schedule</h4>
+              <span id="forecast-total-pill" style="font-size: 0.8rem; font-weight: 700; background: rgba(37, 99, 235, 0.1); color: #2563eb; padding: 0.3rem 0.8rem; border-radius: 12px;">Total Projected Demand: -- units</span>
+            </div>
+            <div style="overflow-x: auto;">
+              <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: left;">
+                <thead>
+                  <tr style="border-bottom: 1px solid var(--border-color); color: var(--text-secondary);">
+                    <th style="padding: 0.75rem 1rem;">Forecast Date</th>
+                    <th style="padding: 0.75rem 1rem;">Horizon Step</th>
+                    <th style="padding: 0.75rem 1rem;">Predicted Demand Units</th>
+                    <th style="padding: 0.75rem 1rem;">Demand Intensity</th>
+                    <th style="padding: 0.75rem 1rem;">Inventory Readiness</th>
+                  </tr>
+                </thead>
+                <tbody id="forecast-predictions-tbody">
+                  <tr>
+                    <td colspan="5" style="padding: 1.5rem; text-align: center; color: var(--text-secondary);">Select parameters and click "Run Forecast" to calculate demand projection.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>
@@ -1349,58 +1549,83 @@
     </div>
   </div>
 
-  <!-- --- BOOKING CONFIRMATION & RENTAL RECEIPT MODAL --- -->
+  <!-- --- BOOKING CONFIRMATION & CASH ON DELIVERY RENTAL RECEIPT MODAL --- -->
   <div class="receipt-modal-overlay" id="booking-receipt-modal" aria-hidden="true">
-    <div class="receipt-modal-container">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+    <div class="receipt-modal-container" style="max-width: 680px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem;">
         <div style="display: flex; align-items: center; gap: 0.6rem;">
-          <span style="font-size: 1.5rem;">📜</span>
-          <h2 style="font-size: 1.4rem; color: var(--accent-primary); margin: 0;">Official Booking Receipt</h2>
+          <span style="font-size: 1.6rem;">📜</span>
+          <div>
+            <h2 style="font-size: 1.35rem; color: var(--accent-primary); margin: 0;">Official Cash on Delivery Rental Receipt</h2>
+            <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.15rem;">HomeRent AI Verified Transaction</div>
+          </div>
         </div>
         <button id="close-receipt-modal-btn" class="close-btn" style="position: static; font-size: 1.8rem;" aria-label="Close Receipt">&times;</button>
       </div>
 
       <!-- Printable Card -->
-      <div class="receipt-card" id="printable-receipt-card">
+      <div class="receipt-card" id="printable-receipt-card" style="border: 1.5px solid var(--border-color); border-radius: 16px; padding: 1.6rem; background: var(--card-bg);">
         <!-- Receipt Header -->
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid var(--border-color); padding-bottom: 1.2rem; margin-bottom: 1.2rem; flex-wrap: wrap; gap: 1rem;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid var(--border-color); padding-bottom: 1rem; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.8rem;">
           <div>
             <div style="font-size: 1.4rem; font-weight: 800; color: var(--accent-primary); letter-spacing: -0.02em;">HomeRent AI</div>
-            <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.2rem;">AI-Powered Smart Appliance Rental Management</div>
+            <div style="font-size: 0.76rem; color: var(--text-secondary); margin-top: 0.15rem;">Household Appliance Rental Management System</div>
           </div>
           <div style="text-align: right;">
-            <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-secondary);">Booking Status</div>
-            <span id="receipt-status" style="display: inline-block; background: rgba(46, 204, 113, 0.15); color: #27ae60; font-weight: 700; padding: 0.25rem 0.8rem; border-radius: 20px; font-size: 0.82rem; margin-top: 0.2rem; border: 1px solid rgba(46, 204, 113, 0.3);">Confirmed</span>
+            <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-secondary);">Receipt No.</div>
+            <div id="receipt-number" style="font-family: monospace; font-size: 0.95rem; font-weight: 800; color: var(--accent-gold);">REC-COD-0000000</div>
           </div>
         </div>
 
-        <!-- Section 1: Customer & Booking Overview -->
-        <div class="receipt-section-title">Customer &amp; Order Details</div>
+        <!-- COD Mandatory Payment Notice Banner -->
+        <div style="background: linear-gradient(135deg, rgba(212, 163, 115, 0.18), rgba(46, 204, 113, 0.15)); border: 1.5px solid var(--accent-gold); border-radius: 12px; padding: 0.9rem 1.1rem; margin-bottom: 1.2rem; text-align: center;">
+          <div style="font-size: 0.92rem; font-weight: 800; color: var(--accent-primary);">
+            💵 Please pay the total amount in cash when the appliance is delivered.
+          </div>
+          <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.25rem;">
+            Do not make any upfront online transfer. Payment status will be confirmed as Paid upon physical cash collection.
+          </div>
+        </div>
+
+        <!-- Section 1: Customer & Order Overview -->
+        <div class="receipt-section-title">1. Customer &amp; Order Information</div>
         <div class="receipt-row">
           <span class="label">Customer Name</span>
-          <span class="value" id="receipt-customer-name">-</span>
+          <span class="value" id="receipt-customer-name" style="font-weight: 700;">-</span>
         </div>
         <div class="receipt-row">
-          <span class="label">Booking / Rental ID</span>
-          <span class="value" id="receipt-booking-id" style="font-family: monospace; color: var(--accent-primary);">-</span>
+          <span class="label">Customer Email</span>
+          <span class="value" id="receipt-customer-email">-</span>
+        </div>
+        <div class="receipt-row">
+          <span class="label">Delivery Address</span>
+          <span class="value" id="receipt-customer-address" style="max-width: 340px; text-align: right;">-</span>
+        </div>
+        <div class="receipt-row">
+          <span class="label">Rental Booking ID</span>
+          <span class="value" id="receipt-booking-id" style="font-family: monospace; color: var(--accent-primary); font-weight: 800;">-</span>
         </div>
         <div class="receipt-row">
           <span class="label">Booking Date</span>
           <span class="value" id="receipt-booking-date">-</span>
         </div>
+        <div class="receipt-row">
+          <span class="label">Order Status</span>
+          <span class="value" id="receipt-order-status" style="color: #27ae60; font-weight: 700;">Confirmed</span>
+        </div>
 
-        <!-- Section 2: Appliance & Rental Details -->
-        <div class="receipt-section-title" style="margin-top: 1.2rem;">Appliance &amp; Tenure Specifications</div>
+        <!-- Section 2: Appliance & Rental Specifications -->
+        <div class="receipt-section-title" style="margin-top: 1.1rem;">2. Appliance &amp; Rental Tenure Specifications</div>
         <div class="receipt-row">
           <span class="label">Appliance Name</span>
-          <span class="value" id="receipt-appliance-name">-</span>
+          <span class="value" id="receipt-appliance-name" style="font-weight: 700;">-</span>
         </div>
         <div class="receipt-row">
-          <span class="label">Appliance Category</span>
-          <span class="value" id="receipt-category">-</span>
+          <span class="label">Category &amp; Quantity</span>
+          <span class="value"><span id="receipt-category">-</span> • Qty: <strong id="receipt-quantity">1</strong></span>
         </div>
         <div class="receipt-row">
-          <span class="label">Selected Tenure</span>
+          <span class="label">Rental Tenure / Duration</span>
           <span class="value" id="receipt-tenure" style="color: var(--accent-gold); font-weight: 700;">-</span>
         </div>
         <div class="receipt-row">
@@ -1408,46 +1633,69 @@
           <span class="value" id="receipt-start-date">-</span>
         </div>
         <div class="receipt-row">
-          <span class="label">Rental End Date</span>
+          <span class="label">Expected Return / End Date</span>
           <span class="value" id="receipt-end-date">-</span>
         </div>
+
+        <!-- Section 3: Itemized Charges & COD Breakdown -->
+        <div class="receipt-section-title" style="margin-top: 1.1rem;">3. Itemized Charges &amp; Cash Payable Breakdown</div>
         <div class="receipt-row">
-          <span class="label">Monthly Rental Price</span>
+          <span class="label">Monthly Rental Rate</span>
           <span class="value" id="receipt-monthly-price">-</span>
         </div>
-        <div class="receipt-row" style="background: var(--bg-tertiary); padding: 0.6rem 0.8rem; border-radius: 10px; margin-top: 0.4rem; border: 1px dashed var(--border-color);">
-          <span class="label" style="font-weight: 700; color: var(--text-primary); font-size: 0.95rem;">Total Rental Amount</span>
-          <span class="value" id="receipt-total-amount" style="font-size: 1.15rem; color: var(--accent-primary); font-weight: 800;">-</span>
+        <div class="receipt-row">
+          <span class="label">Delivery, Setup &amp; Installation</span>
+          <span class="value" style="color: #27ae60; font-weight: 700;">FREE (₹0)</span>
+        </div>
+        <div class="receipt-row">
+          <span class="label">Security Deposit</span>
+          <span class="value" style="color: #27ae60; font-weight: 700;">₹0 (No Deposit)</span>
+        </div>
+        <div class="receipt-row">
+          <span class="label">Applicable GST / Taxes</span>
+          <span class="value" style="color: var(--text-secondary);">Included</span>
+        </div>
+        <div class="receipt-row">
+          <span class="label">Payment Method</span>
+          <span class="value" style="font-weight: 800; color: var(--accent-primary);">Cash on Delivery (COD)</span>
+        </div>
+        <div class="receipt-row">
+          <span class="label">Payment Status</span>
+          <span class="value" id="receipt-pay-status" style="display: inline-block; background: rgba(197,160,89,.18); color: var(--accent-gold); font-weight: 700; padding: 0.2rem 0.75rem; border-radius: 12px; font-size: 0.8rem;">Pending / Pay on Delivery</span>
+        </div>
+        <div class="receipt-row" style="background: var(--bg-tertiary); padding: 0.75rem 0.9rem; border-radius: 10px; margin-top: 0.5rem; border: 1.5px dashed var(--accent-gold);">
+          <span class="label" style="font-weight: 800; color: var(--text-primary); font-size: 1rem;">Final Total Amount Payable in Cash:</span>
+          <span class="value" id="receipt-total-amount" style="font-size: 1.25rem; color: var(--accent-primary); font-weight: 900;">-</span>
         </div>
 
-        <!-- Section 3: Vendor Details -->
-        <div class="receipt-section-title" style="margin-top: 1.2rem;">Authorized Vendor Details</div>
+        <!-- Section 4: Authorized Vendor Details -->
+        <div class="receipt-section-title" style="margin-top: 1.1rem;">4. Authorized Vendor &amp; Support Contact</div>
         <div class="receipt-row">
           <span class="label">Vendor Name</span>
           <span class="value" id="receipt-vendor-name">-</span>
         </div>
         <div class="receipt-row">
-          <span class="label">Vendor Phone Number</span>
+          <span class="label">Vendor Contact Phone</span>
           <span class="value" id="receipt-vendor-phone">-</span>
         </div>
         <div class="receipt-row">
-          <span class="label">Vendor Address</span>
-          <span class="value" id="receipt-vendor-address" style="max-width: 320px; text-align: right; line-height: 1.3;">-</span>
+          <span class="label">Vendor Hub Address</span>
+          <span class="value" id="receipt-vendor-address" style="max-width: 340px; text-align: right; line-height: 1.3;">-</span>
         </div>
 
         <!-- Verification Seal / Note -->
-        <div style="margin-top: 1.5rem; padding-top: 0.9rem; border-top: 1px dashed var(--border-color); font-size: 0.76rem; color: var(--text-secondary); text-align: center;">
+        <div style="margin-top: 1.2rem; padding-top: 0.8rem; border-top: 1px dashed var(--border-color); font-size: 0.74rem; color: var(--text-secondary); text-align: center;">
           🛡️ Verified HomeRent AI Transaction • Free Complimentary Maintenance Included • 24/7 Dedicated Support
         </div>
       </div>
 
       <!-- Action Buttons -->
-      <div class="receipt-actions" style="display: flex; gap: 0.8rem; justify-content: flex-end; margin-top: 1.5rem; flex-wrap: wrap;">
+      <div class="receipt-actions" style="display: flex; gap: 0.8rem; justify-content: flex-end; margin-top: 1.2rem; flex-wrap: wrap;">
         <button type="button" id="receipt-print-btn" class="btn-secondary" style="padding: 0.65rem 1.2rem; font-size: 0.88rem; font-weight: 600; border-radius: 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem;">
-          <span>🖨️</span> Print / Save PDF
+          <span>🖨️</span> Print Receipt
         </button>
         <button type="button" id="receipt-download-file-btn" class="btn-primary" style="padding: 0.65rem 1.3rem; font-size: 0.88rem; font-weight: 600; border-radius: 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem;">
-          <span>📥</span> Download Text Receipt
+          <span>📥</span> Download Receipt
         </button>
         <button type="button" id="receipt-done-btn" class="btn-secondary" style="padding: 0.65rem 1.2rem; font-size: 0.88rem; font-weight: 600; border-radius: 12px; cursor: pointer;">
           Close
@@ -1456,8 +1704,76 @@
     </div>
   </div>
 
+  <!-- Modal: Add / Edit Dynamic Category -->
+  <div class="checkout-overlay" id="category-modal" style="display: none; align-items: center; justify-content: center; z-index: 1000;">
+    <div class="checkout-container" style="max-width: 520px; width: 92%; padding: 2rem; border-radius: 20px; background: var(--bg-secondary); border: 1px solid var(--border-color); box-shadow: var(--shadow-lg); position: relative;">
+      <button id="category-modal-close" class="close-btn" style="position: absolute; top: 18px; right: 20px; font-size: 1.6rem; cursor: pointer; border: none; background: transparent; color: var(--text-secondary);">&times;</button>
+      <h3 id="category-modal-title" class="font-serif" style="font-size: 1.4rem; color: var(--accent-primary); margin: 0 0 1.2rem;">Add New Category</h3>
+      <form id="category-form" style="display: flex; flex-direction: column; gap: 1rem;">
+        <input type="hidden" id="cat-mode" value="create">
+        <div class="form-group">
+          <label for="cat-identifier" style="font-size: 0.8rem; font-weight: 700; color: var(--text-secondary);">CATEGORY IDENTIFIER (SLUG)</label>
+          <input type="text" id="cat-identifier" class="form-input" required placeholder="e.g. entertainment" style="height: 44px;">
+        </div>
+        <div class="form-group">
+          <label for="cat-display-name" style="font-size: 0.8rem; font-weight: 700; color: var(--text-secondary);">DISPLAY NAME</label>
+          <input type="text" id="cat-display-name" class="form-input" required placeholder="e.g. Smart Entertainment" style="height: 44px;">
+        </div>
+        <div class="form-group">
+          <label for="cat-icon" style="font-size: 0.8rem; font-weight: 700; color: var(--text-secondary);">ICON (EMOJI)</label>
+          <input type="text" id="cat-icon" class="form-input" required placeholder="e.g. 📺" style="height: 44px;" maxlength="4">
+        </div>
+        <div class="form-group">
+          <label for="cat-description" style="font-size: 0.8rem; font-weight: 700; color: var(--text-secondary);">DESCRIPTION</label>
+          <textarea id="cat-description" class="form-input" style="height: 70px; resize: vertical;" placeholder="Category details and appliance types included..."></textarea>
+        </div>
+        <div class="form-group" style="display: flex; align-items: center; gap: 0.6rem;">
+          <input type="checkbox" id="cat-is-active" checked style="width: 18px; height: 18px; cursor: pointer;">
+          <label for="cat-is-active" style="font-size: 0.88rem; font-weight: 600; cursor: pointer;">Active in Customer Catalog</label>
+        </div>
+        <div style="display: flex; gap: 0.8rem; justify-content: flex-end; margin-top: 0.5rem;">
+          <button type="button" id="cat-modal-cancel" class="btn-secondary" style="padding: 0.6rem 1.2rem; border-radius: 10px;">Cancel</button>
+          <button type="submit" id="cat-modal-save" class="btn-primary" style="padding: 0.6rem 1.4rem; border-radius: 10px;">Save Category</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Vendor Action on Return Request -->
+  <div class="checkout-overlay" id="return-action-modal" style="display: none; align-items: center; justify-content: center; z-index: 1000;">
+    <div class="checkout-container" style="max-width: 520px; width: 92%; padding: 2rem; border-radius: 20px; background: var(--bg-secondary); border: 1px solid var(--border-color); box-shadow: var(--shadow-lg); position: relative;">
+      <button id="return-action-modal-close" class="close-btn" style="position: absolute; top: 18px; right: 20px; font-size: 1.6rem; cursor: pointer; border: none; background: transparent; color: var(--text-secondary);">&times;</button>
+      <h3 id="return-action-modal-title" class="font-serif" style="font-size: 1.4rem; color: var(--accent-primary); margin: 0 0 1rem;">Respond to Return Request</h3>
+      <div id="return-action-details" style="background: var(--bg-primary); padding: 1rem; border-radius: 12px; margin-bottom: 1.2rem; font-size: 0.85rem; border: 1px solid var(--border-color);">
+        <!-- Summary populated here -->
+      </div>
+      <form id="return-action-form" style="display: flex; flex-direction: column; gap: 1rem;">
+        <input type="hidden" id="return-action-request-id" value="">
+        <input type="hidden" id="return-action-type" value="accept">
+
+        <div class="form-group" id="return-pickup-date-group">
+          <label for="return-action-pickup-date" style="font-size: 0.8rem; font-weight: 700; color: var(--text-secondary);">CONFIRMED PICKUP DATE *</label>
+          <input type="date" id="return-action-pickup-date" class="form-input" style="height: 44px;">
+        </div>
+
+        <div class="form-group">
+          <label for="return-action-note" id="return-action-note-label" style="font-size: 0.8rem; font-weight: 700; color: var(--text-secondary);">VENDOR RESPONSE / INSTRUCTIONS *</label>
+          <textarea id="return-action-note" class="form-input" required style="height: 80px; resize: vertical;" placeholder="Provide instructions or explanation for the customer..."></textarea>
+        </div>
+
+        <div style="display: flex; gap: 0.8rem; justify-content: flex-end; margin-top: 0.5rem;">
+          <button type="button" id="return-action-cancel" class="btn-secondary" style="padding: 0.6rem 1.2rem; border-radius: 10px;">Cancel</button>
+          <button type="submit" id="return-action-submit" class="btn-primary" style="padding: 0.6rem 1.4rem; border-radius: 10px;">Submit Response</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- --- TOAST NOTIFICATIONS CONTAINER --- -->
   <div class="toast-container" id="toast-container"></div>
+
+  <!-- --- RAZORPAY PAYMENT GATEWAY SDK --- -->
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 
   <!-- --- JS INTERACTION SCRIPT --- -->
   <script src="app.js"></script>

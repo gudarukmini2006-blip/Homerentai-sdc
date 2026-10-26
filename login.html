@@ -264,7 +264,11 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ action: 'login', email, password: pw, role })
           });
-          if (!res.ok) { showError("Invalid email, password, or role. Please try again."); return; }
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            showError(errData.error || "Invalid email, password, or role. Please try again.");
+            return;
+          }
           const user = await res.json();
           doLogin(user);
         } catch(err) {
@@ -286,7 +290,11 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ action: 'register', name, email, password: pw, role })
           });
-          if (res.status === 409) { showError("Email already registered. Please sign in."); return; }
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            showError(errData.error || "Registration failed. Please try again.");
+            return;
+          }
           const newUser = await res.json();
           doLogin(newUser);
         } catch(err) {

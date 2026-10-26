@@ -389,6 +389,10 @@ const elements = {
   receiptVendorName: document.getElementById("receipt-vendor-name"),
   receiptVendorPhone: document.getElementById("receipt-vendor-phone"),
   receiptVendorAddress: document.getElementById("receipt-vendor-address"),
+  receiptNumber: document.getElementById("receipt-number"),
+  receiptCustomerEmail: document.getElementById("receipt-customer-email"),
+  receiptCustomerAddress: document.getElementById("receipt-customer-address"),
+  receiptPayStatus: document.getElementById("receipt-pay-status"),
 
   // --- NEW PORTAL ELEMENTS ---
   portalToggle: document.getElementById("portal-toggle"),
@@ -407,8 +411,30 @@ const elements = {
   adminTabs: document.getElementById("admin-tabs"),
   adminInventorySection: document.getElementById("admin-inventory-section"),
   adminBookingsSection: document.getElementById("admin-bookings-section"),
+  adminReturnsSection: document.getElementById("admin-returns-section"),
+  adminCategoriesSection: document.getElementById("admin-categories-section"),
+  vendorReturnBadge: document.getElementById("vendor-return-badge"),
   adminInventoryGrid: document.getElementById("admin-inventory-grid"),
   adminBookingsList: document.getElementById("admin-bookings-list"),
+  adminForecastSection: document.getElementById("admin-forecast-section"),
+  forecastRunBtn: document.getElementById("forecast-run-btn"),
+  forecastRetrainBtn: document.getElementById("forecast-retrain-btn"),
+  forecastScopeSelect: document.getElementById("forecast-scope-select"),
+  forecastHorizonSelect: document.getElementById("forecast-horizon-select"),
+  forecastIntervalSelect: document.getElementById("forecast-interval-select"),
+  forecastApplianceGroup: document.getElementById("forecast-appliance-group"),
+  forecastCategoryGroup: document.getElementById("forecast-category-group"),
+  forecastStatusContainer: document.getElementById("forecast-status-container"),
+  forecastMetricsGrid: document.getElementById("forecast-metrics-grid"),
+  metricRecordsCount: document.getElementById("metric-records-count"),
+  metricTimelineSpan: document.getElementById("metric-timeline-span"),
+  metricMae: document.getElementById("metric-mae"),
+  metricRmse: document.getElementById("metric-rmse"),
+  metricSeasonalityBadge: document.getElementById("metric-seasonality-badge"),
+  metricSeasonalityDesc: document.getElementById("metric-seasonality-desc"),
+  forecastChartContainer: document.getElementById("forecast-chart-container"),
+  forecastTableBody: document.getElementById("forecast-table-body"),
+  forecastTotalPill: document.getElementById("forecast-total-pill"),
   
   // Add Appliance Form
   addApplianceForm: document.getElementById("add-appliance-form"),
@@ -584,14 +610,88 @@ async function loadDatabase() {
     if (custLoc && custLoc.latitude != null && custLoc.longitude != null) {
       appUrl += `?lat=${custLoc.latitude}&lng=${custLoc.longitude}`;
     }
-    const appRes = await fetch(appUrl);
-    const bookRes = await fetch('/api/bookings');
+    const [appRes, bookRes, catRes] = await Promise.all([
+      fetch(appUrl),
+      fetch('/api/bookings'),
+      fetch('/api/categories')
+    ]);
     state.appliances = await appRes.json();
     state.bookings = await bookRes.json();
+    if (catRes.ok) {
+      state.categories = await catRes.json();
+      renderDynamicCategoriesUI();
+    }
   } catch (e) {
     console.error("Failed to load DB", e);
     state.appliances = [...DEFAULT_APPLIANCES];
     state.bookings = [...DEFAULT_BOOKINGS];
+  }
+}
+
+function renderDynamicCategoriesUI() {
+  if (!state.categories || state.categories.length === 0) return;
+  const activeCats = state.categories.filter(c => c.is_active !== false);
+
+  // 1. Catalog filter tabs (#filter-tabs)
+  const filterTabsContainer = document.getElementById("filter-tabs");
+  if (filterTabsContainer) {
+    const curCat = state.currentCategory || "all";
+    let tabsHtml = `<button class="filter-tab ${curCat === 'all' ? 'active' : ''}" data-category="all">All Appliances</button>`;
+    activeCats.forEach(c => {
+      const activeClass = curCat === c.category_name ? 'active' : '';
+      const icon = c.icon ? `${c.icon} ` : '';
+      tabsHtml += `<button class="filter-tab ${activeClass}" data-category="${c.category_name}">${icon}${c.display_name || c.category_name}</button>`;
+    });
+    filterTabsContainer.innerHTML = tabsHtml;
+
+    // Attach click listeners
+    filterTabsContainer.querySelectorAll(".filter-tab").forEach(tab => {
+      tab.addEventListener("click", () => {
+        filterTabsContainer.querySelectorAll(".filter-tab").forEach(t => t.classList.remove("active"));
+        tab.classList.add("active");
+        state.currentCategory = tab.getAttribute("data-category");
+        renderProducts();
+      });
+    });
+  }
+
+  // 2. Header Search Category Select (#header-category-select)
+  const headerCatSelect = document.getElementById("header-category-select");
+  if (headerCatSelect) {
+    const prevVal = headerCatSelect.value || "all";
+    headerCatSelect.innerHTML = `<option value="all">All Categories</option>`;
+    activeCats.forEach(c => {
+      const opt = document.createElement("option");
+      opt.value = c.category_name;
+      opt.textContent = c.display_name || c.category_name;
+      headerCatSelect.appendChild(opt);
+    });
+    headerCatSelect.value = prevVal;
+  }
+
+  // 3. Add Appliance Form Category Dropdown (#appliance-category)
+  if (elements.applianceCategory) {
+    const prevVal = elements.applianceCategory.value;
+    elements.applianceCategory.innerHTML = "";
+    activeCats.forEach(c => {
+      const opt = document.createElement("option");
+      opt.value = c.category_name;
+      opt.textContent = `${c.icon ? c.icon + ' ' : ''}${c.display_name || c.category_name}`;
+      elements.applianceCategory.appendChild(opt);
+    });
+    if (prevVal) elements.applianceCategory.value = prevVal;
+  }
+
+  // 4. Forecast Category Group (#forecast-category-group)
+  const forecastCatGroup = document.getElementById("forecast-category-group");
+  if (forecastCatGroup) {
+    forecastCatGroup.innerHTML = "";
+    activeCats.forEach(c => {
+      const opt = document.createElement("option");
+      opt.value = `cat:${c.category_name}`;
+      opt.textContent = `${c.display_name || c.category_name} Category`;
+      forecastCatGroup.appendChild(opt);
+    });
   }
 }
 
@@ -1498,8 +1598,8 @@ function openCheckout() {
 
   // Reset wizard
   state.checkoutStep = 1;
-  elements.shippingForm.reset();
-  elements.paymentForm.reset();
+  if (elements.shippingForm) elements.shippingForm.reset();
+  if (elements.paymentForm) elements.paymentForm.reset();
   if (state.currentUser) {
     const nameInput = document.getElementById("shipping-name");
     const emailInput = document.getElementById("shipping-email");
@@ -1529,15 +1629,18 @@ function updateCheckoutStepUI() {
     elements.step1Content.classList.add("active");
     elements.stepIndicator1.classList.add("active");
     elements.checkoutBack.style.visibility = "hidden";
-    elements.checkoutNext.textContent = "Continue to Payment Setup";
+    elements.checkoutNext.textContent = "Continue to Payment Review";
     elements.checkoutFooter.style.display = "flex";
   } else if (state.checkoutStep === 2) {
     elements.step2Content.classList.add("active");
     elements.stepIndicator1.classList.add("complete");
     elements.stepIndicator2.classList.add("active");
     elements.checkoutBack.style.visibility = "visible";
-    elements.checkoutNext.textContent = "Confirm Rental Bookings";
     elements.checkoutFooter.style.display = "flex";
+
+    const selectedRadio = document.querySelector('input[name="pay-method"]:checked');
+    const method = selectedRadio ? selectedRadio.value : 'card';
+    window.switchPayMethod(method);
   } else if (state.checkoutStep === 3) {
     elements.step3Content.classList.add("active");
     elements.stepIndicator1.classList.add("complete");
@@ -1546,6 +1649,41 @@ function updateCheckoutStepUI() {
     elements.checkoutFooter.style.display = "none";
   }
 }
+
+window.switchPayMethod = function(method) {
+  const cardView = document.getElementById('card-payment-view');
+  const upiView = document.getElementById('upi-payment-view');
+  const codView = document.getElementById('cod-payment-view');
+  const cardLbl = document.getElementById('pay-card-lbl');
+  const upiLbl = document.getElementById('pay-upi-lbl');
+  const codLbl = document.getElementById('pay-cod-lbl');
+
+  if (cardView) cardView.style.display = method === 'card' ? 'block' : 'none';
+  if (upiView) upiView.style.display = method === 'upi' ? 'block' : 'none';
+  if (codView) codView.style.display = method === 'cod' ? 'block' : 'none';
+
+  if (cardLbl) cardLbl.classList.toggle('active', method === 'card');
+  if (upiLbl) upiLbl.classList.toggle('active', method === 'upi');
+  if (codLbl) codLbl.classList.toggle('active', method === 'cod');
+
+  const radio = document.querySelector(`input[name="pay-method"][value="${method}"]`);
+  if (radio) radio.checked = true;
+
+  if (elements.checkoutNext) {
+    if (method === 'cod') {
+      elements.checkoutNext.textContent = 'Confirm Cash on Delivery Booking';
+    } else {
+      let totalToCharge = 0;
+      for (const item of state.cart) {
+        const addonsTotal = (item.addons || []).reduce((sum, ad) => sum + ad.price, 0);
+        const monthlyRate = item.price + addonsTotal;
+        const months = item.tenureMonths || 1;
+        totalToCharge += monthlyRate * months * item.qty;
+      }
+      elements.checkoutNext.textContent = `Pay ₹${Math.round(totalToCharge).toLocaleString('en-IN')} & Confirm`;
+    }
+  }
+};
 
 async function handleCheckoutNext() {
   if (!state.currentUser) {
@@ -1568,19 +1706,51 @@ async function handleCheckoutNext() {
     state.checkoutStep = 2;
     updateCheckoutStepUI();
   } else if (state.checkoutStep === 2) {
-    if (!elements.paymentForm.reportValidity()) return;
+    const selectedRadio = document.querySelector('input[name="pay-method"]:checked');
+    const payMethod = selectedRadio ? selectedRadio.value : 'card';
 
-    // Determine payment method
-    const activePayLabel = document.querySelector(".pay-method-label.active");
-    const payMethod = activePayLabel ? activePayLabel.getAttribute("data-method") || "card" : "card";
-
-        // COD — skip gateway, finalize directly
-    if (payMethod === "cod") {
-      await finalizeBookingAndShowReceipt(payMethod, null);
+    // 1. CASH ON DELIVERY FLOW
+    if (payMethod === 'cod') {
+      await finalizeBookingAndShowReceipt('cod', null, null, null);
       return;
     }
 
-    // Calculate total to charge (rupees)
+    // 2. CREDIT/DEBIT CARD OR UPI INSTANT (RAZORPAY GATEWAY)
+    if (payMethod === 'card') {
+      const cardNum = document.getElementById('card-number')?.value.replace(/\s/g, '') || '';
+      const cardName = document.getElementById('card-name')?.value.trim() || '';
+      const cardExp = document.getElementById('card-expiry')?.value.trim() || '';
+      const cardCvv = document.getElementById('card-cvv')?.value.trim() || '';
+
+      if (!cardNum || cardNum.length < 12) {
+        showToast('Please enter a valid card number (at least 12 digits).', 'error');
+        document.getElementById('card-number')?.focus();
+        return;
+      }
+      if (!cardName) {
+        showToast('Please enter the cardholder name.', 'error');
+        document.getElementById('card-name')?.focus();
+        return;
+      }
+      if (!cardExp || !cardExp.includes('/')) {
+        showToast('Please enter expiration date in MM/YY format.', 'error');
+        document.getElementById('card-expiry')?.focus();
+        return;
+      }
+      if (!cardCvv || cardCvv.length < 3) {
+        showToast('Please enter a 3-digit CVV.', 'error');
+        document.getElementById('card-cvv')?.focus();
+        return;
+      }
+    } else if (payMethod === 'upi') {
+      const upiId = document.getElementById('upi-id-input')?.value.trim() || '';
+      if (!upiId || !upiId.includes('@')) {
+        showToast('Please enter a valid UPI ID (e.g. name@okhdfcbank or mobile@upi).', 'error');
+        document.getElementById('upi-id-input')?.focus();
+        return;
+      }
+    }
+
     let totalToCharge = 0;
     for (const item of state.cart) {
       const addonsTotal = (item.addons || []).reduce((sum, ad) => sum + ad.price, 0);
@@ -1589,91 +1759,110 @@ async function handleCheckoutNext() {
       totalToCharge += monthlyRate * months * item.qty;
     }
 
-    const preBookingId = "HR-" + Math.floor(100000 + Math.random() * 900000);
+    const custName = document.getElementById("shipping-name")?.value.trim() || (state.currentUser?.name || "Customer");
+    const custEmail = document.getElementById("shipping-email")?.value.trim() || state.currentUser?.email;
+    const custPhone = "9876543210";
 
-    // 1. Create Razorpay order
-    let orderData;
+    elements.checkoutNext.disabled = true;
+    elements.checkoutNext.textContent = "Connecting to Razorpay...";
+
     try {
-      const res = await fetch('/api/payments/create-order', {
+      const orderRes = await fetch('/api/payments/create-order', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-User-Email': state.currentUser.email,
-          'X-User-Role': state.currentUser.role
+          'X-User-Email': custEmail
         },
-        body: JSON.stringify({ amount: totalToCharge, receipt_id: preBookingId })
+        body: JSON.stringify({
+          amount: totalToCharge,
+          email: custEmail,
+          receipt_id: `rcpt_${Date.now()}`
+        })
       });
-      orderData = await res.json();
-      if (!res.ok || orderData.error) {
-        showToast(orderData.error || "Payment initialization failed", "error");
-        return;
+
+      const orderData = await orderRes.json();
+      if (!orderRes.ok || !orderData.order_id) {
+        throw new Error(orderData.error || "Failed to initialize Razorpay payment order");
       }
-    } catch (err) {
-      console.error("Create order failed:", err);
-      showToast("Could not reach payment server. Try again.", "error");
-      return;
-    }
 
-    // 2. Open Razorpay Checkout
-    const options = {
-      key: orderData.key_id,
-      amount: orderData.amount,
-      currency: orderData.currency,
-      name: "HomeRent AI",
-      description: `Rental booking ${preBookingId}`,
-      order_id: orderData.order_id,
-      prefill: {
-        name: document.getElementById("shipping-name").value,
-        email: document.getElementById("shipping-email").value,
-        contact: document.getElementById("shipping-phone")?.value || ""
-      },
-      notes: { booking_id: preBookingId },
-      theme: { color: "#1e3f20" },
+      if (typeof window.Razorpay === "undefined") {
+        throw new Error("Razorpay SDK is not loaded. Please check your internet connection.");
+      }
 
-      handler: async function (response) {
-        try {
-          const verify = await fetch('/api/payments/verify', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature
-            })
-          });
-          const result = await verify.json();
-
-          if (result.success) {
-            await finalizeBookingAndShowReceipt('razorpay', result.payment_id, preBookingId);
-          } else {
-            showToast("Payment verification failed: " + (result.error || "Unknown error"), "error");
+      const options = {
+        key: orderData.key_id,
+        amount: orderData.amount,
+        currency: orderData.currency || "INR",
+        name: "HomeRent AI",
+        description: `Appliance Rental Payment via ${payMethod === 'upi' ? 'UPI' : 'Credit/Debit Card'}`,
+        order_id: orderData.order_id,
+        prefill: {
+          name: custName,
+          email: custEmail,
+          contact: custPhone,
+          method: payMethod === 'upi' ? 'upi' : 'card',
+          vpa: payMethod === 'upi' ? (document.getElementById('upi-id-input')?.value.trim() || undefined) : undefined
+        },
+        theme: {
+          color: "#1c3d2e"
+        },
+        modal: {
+          ondismiss: function () {
+            elements.checkoutNext.disabled = false;
+            updateCheckoutStepUI();
+            showToast("Payment window closed. You can retry or choose Pay on Delivery.", "info");
           }
-        } catch (err) {
-          console.error("Verify failed:", err);
-          showToast("Payment verification error. Contact support.", "error");
-        }
-      },
+        },
+        handler: async function (response) {
+          elements.checkoutNext.textContent = "Verifying Payment...";
+          try {
+            const verifyRes = await fetch('/api/payments/verify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature
+              })
+            });
 
-      modal: {
-        ondismiss: function () {
-          showToast("Payment cancelled. You can try again.", "info");
+            const verifyData = await verifyRes.json();
+            if (verifyRes.ok && verifyData.success) {
+              showToast("Payment verified successfully via Razorpay!", "success");
+              await finalizeBookingAndShowReceipt('razorpay', response.razorpay_payment_id, null, response.razorpay_order_id);
+            } else {
+              showToast(verifyData.error || "Payment signature verification failed.", "error");
+              elements.checkoutNext.disabled = false;
+              updateCheckoutStepUI();
+            }
+          } catch (err) {
+            console.error("Verification error:", err);
+            await finalizeBookingAndShowReceipt('razorpay', response.razorpay_payment_id, null, response.razorpay_order_id);
+          }
         }
-      }
-    };
+      };
 
-    const rzp = new Razorpay(options);
-    rzp.on('payment.failed', function (response) {
-      console.error("Payment failed:", response.error);
-      showToast("Payment failed: " + response.error.description, "error");
-    });
-    rzp.open();
+      const rzp = new window.Razorpay(options);
+      rzp.on('payment.failed', function (resp) {
+        showToast(`Payment failed: ${resp.error?.description || 'Transaction unsuccessful'}`, "error");
+        elements.checkoutNext.disabled = false;
+        updateCheckoutStepUI();
+      });
+      rzp.open();
+
+    } catch (err) {
+      console.error("Razorpay initiation error:", err);
+      showToast(err.message || "Unable to start Razorpay payment. You can choose Pay on Delivery instead.", "error");
+      elements.checkoutNext.disabled = false;
+      updateCheckoutStepUI();
+    }
   }
 }
 
 // ─────────────────────────────────────────────────────────
 // FINALIZE BOOKING (called after successful payment or COD)
 // ─────────────────────────────────────────────────────────
-async function finalizeBookingAndShowReceipt(payMethod, paymentId, providedBookingId) {
+async function finalizeBookingAndShowReceipt(payMethod, paymentId, providedBookingId, orderId) {
   state.checkoutStep = 3;
   const bookingId = providedBookingId || ("HR-" + Math.floor(100000 + Math.random() * 900000));
   elements.orderTrackingId.textContent = bookingId;
@@ -1684,6 +1873,7 @@ async function finalizeBookingAndShowReceipt(payMethod, paymentId, providedBooki
   const todayStr = new Date().toLocaleDateString("en-IN", { day: '2-digit', month: '2-digit', year: 'numeric' });
 
   let primaryBooking = null;
+  const isOnline = payMethod === 'razorpay' || payMethod === 'online' || payMethod === 'upi';
 
   for (const item of state.cart) {
     const baseAppliance = state.appliances.find(a => a.id === item.id) || {};
@@ -1715,10 +1905,16 @@ async function finalizeBookingAndShowReceipt(payMethod, paymentId, providedBooki
       monthlyRent: monthlyRate,
       total_amount: totalAmount,
       totalRent: totalAmount,
-      paymentMethod: payMethod,
+      paymentMethod: isOnline ? 'razorpay' : 'cod',
+      payment_method: isOnline ? 'razorpay' : 'cod',
       paymentId: paymentId || null,
-      payment_status: payMethod === 'cod' ? 'pending' : 'paid',
-      status: "Confirmed",
+      razorpay_payment_id: paymentId || null,
+      razorpay_order_id: orderId || null,
+      payment_status: isOnline ? 'paid' : 'pending',
+      receipt_number: isOnline
+        ? ('REC-ONL-' + Math.floor(1000000 + Math.random() * 9000000))
+        : ('REC-COD-' + Math.floor(1000000 + Math.random() * 9000000)),
+      status: isOnline ? "Active" : "Confirmed",
       start_date: dateRange.startDateStr,
       end_date: dateRange.endDateStr,
       date: todayStr,
@@ -1761,9 +1957,9 @@ async function finalizeBookingAndShowReceipt(payMethod, paymentId, providedBooki
   await saveCartToStorage();
   updateCartUI();
 
-  const successMsg = payMethod === 'cod'
-    ? "Order placed! Pay cash on delivery."
-    : "Payment successful! Booking confirmed.";
+  const successMsg = isOnline
+    ? "Payment successful via Razorpay! Rental booking active."
+    : "Rental request placed! Please pay cash on delivery.";
   showToast(successMsg, "success");
 }
 
@@ -1779,8 +1975,13 @@ function renderReceiptUI(booking) {
   if (!booking) return;
 
   const getCleanVal = (val, fallback = "N/A") => (val !== undefined && val !== null && String(val).trim() !== "") ? val : fallback;
+  const isOnline = booking.paymentMethod === 'razorpay' || booking.payment_method === 'razorpay' || booking.paymentMethod === 'online' || booking.paymentMethod === 'upi';
+  const defaultPrefix = isOnline ? 'REC-ONL-' : 'REC-COD-';
 
+  if (elements.receiptNumber) elements.receiptNumber.textContent = getCleanVal(booking.receipt_number || (defaultPrefix + booking.id));
   if (elements.receiptCustomerName) elements.receiptCustomerName.textContent = getCleanVal(booking.customerName || booking.customer_name);
+  if (elements.receiptCustomerEmail) elements.receiptCustomerEmail.textContent = getCleanVal(booking.email || booking.user_id);
+  if (elements.receiptCustomerAddress) elements.receiptCustomerAddress.textContent = getCleanVal(booking.address);
   if (elements.receiptApplianceName) elements.receiptApplianceName.textContent = getCleanVal(booking.applianceName || booking.appliance_name);
   if (elements.receiptCategory) elements.receiptCategory.textContent = getCleanVal((booking.category || "Appliance").toUpperCase());
   if (elements.receiptBookingId) elements.receiptBookingId.textContent = getCleanVal(booking.id);
@@ -1794,6 +1995,19 @@ function renderReceiptUI(booking) {
   if (elements.receiptMonthlyPrice) elements.receiptMonthlyPrice.textContent = `₹${Math.round(monthlyPrice).toLocaleString('en-IN')} / month`;
   if (elements.receiptTotalAmount) elements.receiptTotalAmount.textContent = `₹${Math.round(totalAmount).toLocaleString('en-IN')}`;
   
+  if (elements.receiptPayStatus) {
+    const isPaid = booking.payment_status === 'paid';
+    if (isPaid) {
+      elements.receiptPayStatus.textContent = isOnline ? 'Paid Online (Razorpay / UPI)' : 'Paid (Cash Collected)';
+      elements.receiptPayStatus.style.background = 'rgba(46,204,113,0.18)';
+      elements.receiptPayStatus.style.color = '#27ae60';
+    } else {
+      elements.receiptPayStatus.textContent = 'Pending / Pay on Delivery';
+      elements.receiptPayStatus.style.background = 'rgba(197,160,89,0.18)';
+      elements.receiptPayStatus.style.color = 'var(--accent-gold)';
+    }
+  }
+
   if (elements.receiptVendorName) elements.receiptVendorName.textContent = getCleanVal(booking.vendor_name || booking.vendorName, "HomeRent Verified Vendor");
   
   const phone = getCleanVal(booking.vendor_phone || booking.vendorPhone);
@@ -1831,20 +2045,29 @@ function downloadReceiptFile(booking) {
     return;
   }
 
+  const isOnline = b.paymentMethod === 'razorpay' || b.payment_method === 'razorpay' || b.paymentMethod === 'online' || b.paymentMethod === 'upi';
   const monthlyPrice = Math.round(Number(b.monthly_price || b.monthlyRent || (b.totalRent / (b.tenure_months || 1)) || 0));
   const totalAmount = Math.round(Number(b.total_amount || b.totalRent || (monthlyPrice * (b.tenure_months || 1)) || 0));
+  const receiptNo = b.receipt_number || ((isOnline ? 'REC-ONL-' : 'REC-COD-') + (b.id || Date.now()));
+  const payMethodStr = isOnline ? 'Online / UPI (Razorpay)' : 'Cash on Delivery (COD)';
+  const payStatus = b.payment_status === 'paid'
+    ? (isOnline ? 'Paid Online (Verified via Razorpay)' : 'Paid (Cash Collected)')
+    : 'Pending / Pay on Delivery';
 
   const content = `============================================================
-              HOMERENT AI - OFFICIAL BOOKING RECEIPT
-         Smart Appliance Rental Management System
+              HOMERENT AI - OFFICIAL RENTAL RECEIPT
+           ${isOnline ? 'ONLINE PAYMENT (RAZORPAY / UPI)' : 'CASH ON DELIVERY (COD)'}
 ============================================================
 
-BOOKING REFERENCE ID: ${b.id || 'N/A'}
+RECEIPT NUMBER:       ${receiptNo}
+ORDER / BOOKING ID:   ${b.id || 'N/A'}
 BOOKING STATUS:       ${(b.status || 'Confirmed').toUpperCase()}
 BOOKING DATE:         ${b.date || new Date().toLocaleDateString("en-IN")}
-
+PAYMENT METHOD:       ${payMethodStr}
+PAYMENT STATUS:       ${payStatus}
+${isOnline && (b.razorpay_payment_id || b.paymentId) ? `TRANSACTION ID:       ${b.razorpay_payment_id || b.paymentId}\n` : ''}
 ------------------------------------------------------------
-CUSTOMER DETAILS
+CUSTOMER INFORMATION
 ------------------------------------------------------------
 Customer Name:        ${b.customerName || b.customer_name || 'Valued Customer'}
 Email Address:        ${b.email || b.user_id || 'N/A'}
@@ -1854,19 +2077,32 @@ Delivery Address:     ${b.address || 'N/A'}
 APPLIANCE & RENTAL SPECIFICATIONS
 ------------------------------------------------------------
 Appliance Name:       ${b.applianceName || b.appliance_name || 'N/A'}
-Appliance Category:   ${(b.category || 'Appliance').toUpperCase()}
-Selected Tenure:      ${b.tenure || `${b.tenure_months || 1} Month(s)`}
+Category:             ${(b.category || 'Appliance').toUpperCase()}
+Quantity:             ${b.quantity || 1} Unit(s)
+Rental Tenure:        ${b.tenure || `${b.tenure_months || 1} Month(s)`}
 Rental Start Date:    ${b.start_date || b.startDate || 'N/A'}
-Rental End Date:      ${b.end_date || b.endDate || 'N/A'}
-Monthly Rental Price: ₹${monthlyPrice.toLocaleString('en-IN')} / month
-Total Rental Amount:  ₹${totalAmount.toLocaleString('en-IN')}
+Expected Return Date: ${b.end_date || b.endDate || 'N/A'}
 
 ------------------------------------------------------------
-AUTHORIZED VENDOR DETAILS
+ITEMIZED CHARGES & PAYMENT SUMMARY
+------------------------------------------------------------
+Base Monthly Rent:    ₹${monthlyPrice.toLocaleString('en-IN')} / month
+Delivery Charges:     ₹0.00 (Complimentary)
+Applicable Taxes:     Included
+------------------------------------------------------------
+FINAL TOTAL:          ₹${totalAmount.toLocaleString('en-IN')}
+------------------------------------------------------------
+
+${isOnline ? `PAYMENT CONFIRMATION:
+"Payment successfully verified and settled online via Razorpay Gateway. Thank you!"` : `IMPORTANT NOTICE:
+"Please pay the total amount in cash when the appliance is delivered."`}
+
+------------------------------------------------------------
+AUTHORIZED VENDOR INFORMATION
 ------------------------------------------------------------
 Vendor Name:          ${b.vendor_name || b.vendorName || 'HomeRent Verified Vendor'}
-Vendor Phone Number:  ${b.vendor_phone || b.vendorPhone || 'N/A'}
-Vendor Address:       ${b.vendor_address || b.vendorAddress || 'Indiranagar, Bengaluru, Karnataka'}
+Vendor Contact:       ${b.vendor_phone || b.vendorPhone || 'N/A'}
+Vendor Hub Address:   ${b.vendor_address || b.vendorAddress || 'Indiranagar, Bengaluru, Karnataka'}
 
 ============================================================
 Free complimentary maintenance, lifetime servicing, and 24/7
@@ -1878,16 +2114,17 @@ Thank you for choosing HomeRent AI!
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `HomeRent_Receipt_${b.id || 'Booking'}.txt`;
+  a.download = `HomeRent_${isOnline ? 'Online' : 'COD'}_Receipt_${receiptNo}.txt`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
-  showToast("Receipt downloaded successfully!", "success");
+  showToast(`${isOnline ? 'Online' : 'Cash on Delivery'} Receipt downloaded successfully!`, "success");
 }
 
-// --- INTERACTIVE CREDIT CARD VISUALS ---
+// --- INTERACTIVE CREDIT CARD VISUALS (GUARDED) ---
 function setupCreditCardListeners() {
+  if (!elements.cardCvv || !elements.cardNumber || !elements.cardName) return;
   elements.cardCvv.addEventListener("focus", () => {
     elements.interactiveCard.classList.add("flipped");
   });
@@ -1933,11 +2170,11 @@ function setupCreditCardListeners() {
 }
 
 function resetInteractiveCard() {
-  elements.interactiveCard.classList.remove("flipped");
-  elements.cardNumDisp.textContent = "•••• •••• •••• ••••";
-  elements.cardNameDisp.textContent = "FULL NAME";
-  elements.cardExpDisp.textContent = "MM/YY";
-  elements.cardCvvDisp.textContent = "•••";
+  if (elements.interactiveCard) elements.interactiveCard.classList.remove("flipped");
+  if (elements.cardNumDisp) elements.cardNumDisp.textContent = "•••• •••• •••• ••••";
+  if (elements.cardNameDisp) elements.cardNameDisp.textContent = "FULL NAME";
+  if (elements.cardExpDisp) elements.cardExpDisp.textContent = "MM/YY";
+  if (elements.cardCvvDisp) elements.cardCvvDisp.textContent = "•••";
 }
 
 // --- TOAST NOTIFICATIONS ---
@@ -2000,7 +2237,7 @@ function setupNewPortalListeners() {
     }
   });
 
-  // Admin sub-tabs toggle (Manage Inventory & Active Bookings)
+  // Admin sub-tabs toggle (Manage Inventory, Active Bookings, Return Requests, Categories, AI Forecast)
   if (elements.adminTabs) {
     elements.adminTabs.addEventListener("click", (e) => {
       const tabBtn = e.target.closest(".filter-tab");
@@ -2011,14 +2248,22 @@ function setupNewPortalListeners() {
         const tabName = tabBtn.getAttribute("data-admin-tab");
         state.currentAdminTab = tabName;
 
+        if (elements.adminInventorySection) elements.adminInventorySection.classList.toggle("active", tabName === "inventory");
+        if (elements.adminBookingsSection) elements.adminBookingsSection.classList.toggle("active", tabName === "bookings");
+        if (elements.adminReturnsSection) elements.adminReturnsSection.classList.toggle("active", tabName === "returns");
+        if (elements.adminCategoriesSection) elements.adminCategoriesSection.classList.toggle("active", tabName === "categories");
+        if (elements.adminForecastSection) elements.adminForecastSection.classList.toggle("active", tabName === "forecast");
+
         if (tabName === "inventory") {
-          if (elements.adminInventorySection) elements.adminInventorySection.classList.add("active");
-          if (elements.adminBookingsSection) elements.adminBookingsSection.classList.remove("active");
           renderAdminInventory();
         } else if (tabName === "bookings") {
-          if (elements.adminInventorySection) elements.adminInventorySection.classList.remove("active");
-          if (elements.adminBookingsSection) elements.adminBookingsSection.classList.add("active");
           renderAdminBookings();
+        } else if (tabName === "returns") {
+          renderAdminReturnRequests();
+        } else if (tabName === "categories") {
+          renderAdminCategories();
+        } else if (tabName === "forecast") {
+          initForecastConsole();
         }
       }
     });
@@ -2181,10 +2426,40 @@ function getVendorScopedData() {
 
 function updateAdminDashboard() {
   updateAdminMetrics();
+  updateReturnBadgeCount();
   if (state.currentAdminTab === "inventory") {
     renderAdminInventory();
   } else if (state.currentAdminTab === "bookings") {
     renderAdminBookings();
+  } else if (state.currentAdminTab === "returns") {
+    renderAdminReturnRequests();
+  } else if (state.currentAdminTab === "categories") {
+    renderAdminCategories();
+  } else if (state.currentAdminTab === "forecast") {
+    initForecastConsole();
+  }
+}
+
+async function updateReturnBadgeCount() {
+  if (!elements.vendorReturnBadge) return;
+  const vendorEmail = (state.currentUser?.email || 'vendor@homerent.ai').trim().toLowerCase();
+  try {
+    const res = await fetch(`/api/return-requests?role=vendor`, {
+      headers: {
+        'X-User-Email': vendorEmail,
+        'X-User-Role': 'vendor'
+      }
+    });
+    if (res.ok) {
+      const requests = await res.json();
+      const pendingCount = requests.filter(r => r.status === 'pending').length;
+      elements.vendorReturnBadge.textContent = pendingCount;
+      elements.vendorReturnBadge.style.display = pendingCount > 0 ? 'inline-block' : 'none';
+      const counterEl = document.getElementById("returns-pending-counter");
+      if (counterEl) counterEl.textContent = `${pendingCount} Pending Review`;
+    }
+  } catch (err) {
+    console.warn("Could not update vendor return badge:", err);
   }
 }
 
@@ -2311,6 +2586,7 @@ function renderAdminBookings() {
 
   bookingsToShow.forEach((booking) => {
     const trueIndex = state.bookings.findIndex(b => b.id === booking.id);
+    const isPaid = booking.payment_status === "paid";
     
     const card = document.createElement("div");
     card.className = "booking-card";
@@ -2320,11 +2596,18 @@ function renderAdminBookings() {
         <h4>${booking.customerName}</h4>
         <p>${booking.email}</p>
         <div style="font-size: 0.75rem; margin-top: 0.3rem; color: var(--text-secondary);">Date: ${booking.date}</div>
+        <div style="font-size: 0.75rem; margin-top: 0.2rem; color: var(--accent-gold); font-weight: 600;">Receipt: ${booking.receipt_number || ('REC-COD-' + booking.id)}</div>
       </div>
       <div class="booking-details">
         <strong>${booking.applianceName}</strong>
         <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.2rem;">Tenure: ${booking.tenure}</div>
         <div style="font-size: 0.7rem; color: var(--text-secondary); max-width: 200px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;" title="${booking.address}">${booking.address}</div>
+        <div style="margin-top: 0.4rem;">
+          ${isPaid
+            ? `<span style="background: rgba(39, 174, 96, 0.15); color: #27ae60; font-weight: 700; padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.72rem; display: inline-flex; align-items: center; gap: 0.25rem;">✔ Paid (Cash Collected)</span>`
+            : `<span style="background: rgba(230, 126, 34, 0.15); color: #d35400; font-weight: 700; padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.72rem; display: inline-flex; align-items: center; gap: 0.25rem;">⏳ Pay on Delivery (Pending)</span>`
+          }
+        </div>
       </div>
       <div class="booking-price">
         ₹${Math.round(booking.totalRent)}/mo
@@ -2335,6 +2618,11 @@ function renderAdminBookings() {
           <option value="active" ${booking.status === "active" ? "selected" : ""}>Delivered / Active</option>
           <option value="completed" ${booking.status === "completed" ? "selected" : ""}>Completed / Returned</option>
         </select>
+        ${!isPaid ? `
+          <button type="button" class="btn-primary confirm-cod-btn" data-id="${booking.id}" style="padding: 0.35rem 0.6rem; font-size: 0.75rem; border-radius: 8px; background: #27ae60; color: white; display: inline-flex; align-items: center; justify-content: center; gap: 0.3rem; cursor: pointer; border: none; font-weight: 600;">
+            <span>💵</span> Confirm Cash Collected
+          </button>
+        ` : ''}
         <button type="button" class="btn-secondary view-booking-receipt-btn" style="padding: 0.35rem 0.6rem; font-size: 0.75rem; border-radius: 8px; border: 1px solid var(--border-color); display: inline-flex; align-items: center; justify-content: center; gap: 0.3rem; cursor: pointer;">
           <span>📄</span> View Receipt
         </button>
@@ -2346,6 +2634,37 @@ function renderAdminBookings() {
       renderReceiptUI(booking);
       openReceiptModal();
     });
+
+    // COD Confirm Handler
+    const codBtn = card.querySelector(".confirm-cod-btn");
+    if (codBtn) {
+      codBtn.addEventListener("click", async () => {
+        if (!confirm(`Confirm collection of cash payment of ₹${Math.round(booking.totalRent)} for booking ${booking.id}?`)) return;
+        try {
+          const vendorEmail = (state.currentUser?.email || 'vendor@homerent.ai').trim().toLowerCase();
+          const res = await fetch(`/api/bookings/${booking.id}/cod-confirm`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-User-Email': vendorEmail,
+              'X-User-Role': 'vendor'
+            }
+          });
+          if (res.ok) {
+            booking.payment_status = 'paid';
+            if (trueIndex > -1) state.bookings[trueIndex].payment_status = 'paid';
+            showToast(`Cash payment collected for booking ${booking.id}! Marked as Paid.`, "success");
+            renderAdminBookings();
+            updateAdminMetrics();
+          } else {
+            const err = await res.json();
+            showToast(err.error || "Failed to confirm cash collection", "error");
+          }
+        } catch (err) {
+          showToast("Network error confirming cash payment", "error");
+        }
+      });
+    }
 
     // Dropdown status handler
     card.querySelector("select").addEventListener("change", async (e) => {
@@ -2379,6 +2698,957 @@ function renderAdminBookings() {
 
     elements.adminBookingsList.appendChild(card);
   });
+}
+
+// ─────────────────────────────────────────────
+// VENDOR CONSOLE: RETURN REQUESTS MANAGEMENT
+// ─────────────────────────────────────────────
+
+let returnActionListenersSetup = false;
+
+async function renderAdminReturnRequests() {
+  const container = document.getElementById("vendor-returns-list");
+  if (!container) return;
+
+  container.innerHTML = `<div style="text-align: center; padding: 2rem; color: var(--text-secondary);">Loading customer return requests from MongoDB...</div>`;
+  const vendorEmail = (state.currentUser?.email || 'vendor@homerent.ai').trim().toLowerCase();
+
+  try {
+    const res = await fetch(`/api/return-requests?role=vendor`, {
+      headers: {
+        'X-User-Email': vendorEmail,
+        'X-User-Role': 'vendor'
+      }
+    });
+    if (!res.ok) throw new Error("Could not fetch return requests");
+    const requests = await res.json();
+
+    // Update pending badge & counter
+    const pendingCount = requests.filter(r => r.status === 'pending').length;
+    if (elements.vendorReturnBadge) {
+      elements.vendorReturnBadge.textContent = pendingCount;
+      elements.vendorReturnBadge.style.display = pendingCount > 0 ? 'inline-block' : 'none';
+    }
+    const counterEl = document.getElementById("returns-pending-counter");
+    if (counterEl) counterEl.textContent = `${pendingCount} Pending Review`;
+
+    if (requests.length === 0) {
+      container.innerHTML = `
+        <div style="text-align: center; padding: 3rem 1.5rem; background: var(--bg-secondary); border-radius: 16px; border: 1.5px dashed var(--border-color);">
+          <span style="font-size: 2.2rem; display: block; margin-bottom: 0.5rem;">↩️</span>
+          <p style="font-size: 1.05rem; font-weight: 600; color: var(--accent-primary); margin-bottom: 0.3rem;">No Early Return Requests</p>
+          <p style="color: var(--text-secondary); font-size: 0.88rem; max-width: 460px; margin: 0 auto;">No active return requests found for your rented appliances.</p>
+        </div>`;
+      return;
+    }
+
+    container.innerHTML = "";
+    requests.forEach(req => {
+      const card = document.createElement("div");
+      card.className = "glass-panel";
+      card.style.cssText = "padding: 1.4rem; border-radius: 16px; border: 1px solid var(--border-color); background: var(--bg-secondary); display: flex; flex-direction: column; gap: 0.8rem;";
+
+      const statusColors = {
+        pending: { bg: "rgba(230, 126, 34, 0.15)", color: "#d35400", label: "Pending Review" },
+        accepted: { bg: "rgba(52, 152, 219, 0.15)", color: "#2980b9", label: "Accepted / Pickup Scheduled" },
+        rejected: { bg: "rgba(231, 76, 60, 0.15)", color: "#c0392b", label: "Rejected" },
+        returned: { bg: "rgba(39, 174, 96, 0.15)", color: "#27ae60", label: "Returned & Inventory Restocked" }
+      };
+      const st = statusColors[req.status] || { bg: "rgba(100,100,100,0.1)", color: "var(--text-secondary)", label: req.status };
+
+      card.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 0.8rem;">
+          <div>
+            <div style="display: flex; align-items: center; gap: 0.6rem;">
+              <h4 style="margin: 0; font-size: 1.1rem; color: var(--accent-primary);">${req.appliance_name}</h4>
+              <span style="background: ${st.bg}; color: ${st.color}; font-weight: 700; padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.74rem;">${st.label}</span>
+            </div>
+            <div style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 0.3rem;">
+              Customer: <strong>${req.customer_name}</strong> (${req.customer_email}) • Booking ID: <code>${req.booking_id}</code>
+            </div>
+          </div>
+          <div style="font-size: 0.8rem; color: var(--text-secondary); text-align: right;">
+            <div>Request Date: <strong>${req.request_date ? req.request_date.slice(0, 10) : 'N/A'}</strong></div>
+            <div style="color: var(--accent-gold); font-weight: 600; margin-top: 0.2rem;">Requested Pickup: ${req.requested_pickup_date || 'N/A'}</div>
+          </div>
+        </div>
+
+        <div style="background: var(--bg-primary); padding: 0.85rem 1rem; border-radius: 10px; border: 1px solid var(--border-color); font-size: 0.85rem;">
+          <div style="color: var(--text-secondary); font-size: 0.75rem; font-weight: 700; text-transform: uppercase; margin-bottom: 0.25rem;">Customer Return Reason</div>
+          <div>${req.reason || "No specific reason provided."}</div>
+        </div>
+
+        ${req.vendor_note ? `
+          <div style="background: rgba(52, 152, 219, 0.08); padding: 0.85rem 1rem; border-radius: 10px; border: 1px solid rgba(52, 152, 219, 0.3); font-size: 0.85rem;">
+            <div style="color: #2980b9; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; margin-bottom: 0.25rem;">Your Vendor Response & Pickup Instructions</div>
+            <div>${req.vendor_note}</div>
+            ${req.confirmed_pickup_date ? `<div style="margin-top: 0.3rem; font-weight: 600; color: #2980b9;">Confirmed Pickup: ${req.confirmed_pickup_date}</div>` : ''}
+          </div>
+        ` : ''}
+
+        <div style="display: flex; gap: 0.6rem; justify-content: flex-end; align-items: center; margin-top: 0.4rem; flex-wrap: wrap;">
+          ${req.status === 'pending' ? `
+            <button type="button" class="btn-primary accept-return-btn" style="padding: 0.45rem 1rem; font-size: 0.8rem; border-radius: 8px; background: #27ae60; color: white; display: inline-flex; align-items: center; gap: 0.3rem; cursor: pointer; border: none; font-weight: 600;">
+              <span>✔</span> Accept & Schedule Pickup
+            </button>
+            <button type="button" class="btn-secondary reject-return-btn" style="padding: 0.45rem 1rem; font-size: 0.8rem; border-radius: 8px; background: rgba(231, 76, 60, 0.12); color: #c0392b; border: 1px solid rgba(231, 76, 60, 0.4); display: inline-flex; align-items: center; gap: 0.3rem; cursor: pointer; font-weight: 600;">
+              <span>✖</span> Reject Request
+            </button>
+          ` : ''}
+          ${req.status === 'accepted' ? `
+            <button type="button" class="btn-primary confirm-returned-btn" style="padding: 0.45rem 1.1rem; font-size: 0.82rem; border-radius: 8px; background: #2980b9; color: white; display: inline-flex; align-items: center; gap: 0.3rem; cursor: pointer; border: none; font-weight: 600;">
+              <span>📦</span> Confirm Returned & Restock Inventory
+            </button>
+          ` : ''}
+        </div>
+      `;
+
+      // Accept button handler
+      const acceptBtn = card.querySelector(".accept-return-btn");
+      if (acceptBtn) {
+        acceptBtn.addEventListener("click", () => openReturnActionModal(req, "accept"));
+      }
+
+      // Reject button handler
+      const rejectBtn = card.querySelector(".reject-return-btn");
+      if (rejectBtn) {
+        rejectBtn.addEventListener("click", () => openReturnActionModal(req, "reject"));
+      }
+
+      // Confirm Returned handler
+      const returnedBtn = card.querySelector(".confirm-returned-btn");
+      if (returnedBtn) {
+        returnedBtn.addEventListener("click", async () => {
+          if (!confirm(`Confirm that appliance '${req.appliance_name}' from booking ${req.booking_id} has been physically received and inspected? This will restore 1 unit to available stock and complete the booking.`)) return;
+          try {
+            const res = await fetch(`/api/return-requests/${req._id || req.id}`, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-User-Email': vendorEmail,
+                'X-User-Role': 'vendor'
+              },
+              body: JSON.stringify({ action: 'returned' })
+            });
+            if (res.ok) {
+              showToast("Return completed! Inventory restocked +1 available.", "success");
+              await loadDatabase();
+              renderAdminReturnRequests();
+              updateAdminMetrics();
+            } else {
+              const err = await res.json();
+              showToast(err.error || "Failed to confirm return", "error");
+            }
+          } catch (err) {
+            showToast("Network error confirming return", "error");
+          }
+        });
+      }
+
+      container.appendChild(card);
+    });
+
+  } catch (err) {
+    container.innerHTML = `<div style="text-align: center; color: #e74c3c; padding: 2rem;">Error loading return requests: ${err.message}</div>`;
+  }
+}
+
+function openReturnActionModal(req, actionType) {
+  const modal = document.getElementById("return-action-modal");
+  const titleEl = document.getElementById("return-action-modal-title");
+  const detailsEl = document.getElementById("return-action-details");
+  const reqIdInput = document.getElementById("return-action-request-id");
+  const actionTypeInput = document.getElementById("return-action-type");
+  const pickupGroup = document.getElementById("return-pickup-date-group");
+  const pickupDateInput = document.getElementById("return-action-pickup-date");
+  const noteInput = document.getElementById("return-action-note");
+  const noteLabel = document.getElementById("return-action-note-label");
+  const submitBtn = document.getElementById("return-action-submit");
+
+  if (!modal) return;
+
+  reqIdInput.value = req._id || req.id;
+  actionTypeInput.value = actionType;
+  detailsEl.innerHTML = `
+    <strong>Appliance:</strong> ${req.appliance_name}<br>
+    <strong>Customer:</strong> ${req.customer_name} (${req.customer_email})<br>
+    <strong>Requested Pickup:</strong> ${req.requested_pickup_date || 'N/A'}<br>
+    <strong>Reason:</strong> ${req.reason}
+  `;
+
+  if (actionType === "accept") {
+    titleEl.textContent = "Accept Return Request & Schedule Pickup";
+    pickupGroup.style.display = "block";
+    if (pickupDateInput) pickupDateInput.value = req.requested_pickup_date || new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+    noteLabel.textContent = "VENDOR PICKUP INSTRUCTIONS & CONTACT NOTE *";
+    noteInput.placeholder = "e.g. Pickup scheduled between 2 PM - 5 PM. Our technician Rahul will contact you before arriving.";
+    submitBtn.textContent = "Confirm & Accept Request";
+    submitBtn.style.background = "#27ae60";
+  } else {
+    titleEl.textContent = "Reject Return Request";
+    pickupGroup.style.display = "none";
+    noteLabel.textContent = "REASON FOR REJECTION *";
+    noteInput.placeholder = "e.g. Return notice falls outside our minimum 3-day advance notice policy for this rental contract.";
+    submitBtn.textContent = "Reject Request";
+    submitBtn.style.background = "#e74c3c";
+  }
+
+  noteInput.value = "";
+  modal.style.display = "flex";
+}
+
+function closeReturnActionModal() {
+  const modal = document.getElementById("return-action-modal");
+  if (modal) modal.style.display = "none";
+}
+
+function setupReturnActionModalListeners() {
+  if (returnActionListenersSetup) return;
+  returnActionListenersSetup = true;
+
+  const modal = document.getElementById("return-action-modal");
+  const closeBtn = document.getElementById("return-action-modal-close");
+  const cancelBtn = document.getElementById("return-action-cancel");
+  const form = document.getElementById("return-action-form");
+  const refreshBtn = document.getElementById("refresh-returns-btn");
+
+  if (closeBtn) closeBtn.addEventListener("click", closeReturnActionModal);
+  if (cancelBtn) cancelBtn.addEventListener("click", closeReturnActionModal);
+  if (modal) {
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) closeReturnActionModal();
+    });
+  }
+  if (refreshBtn) {
+    refreshBtn.addEventListener("click", renderAdminReturnRequests);
+  }
+
+  if (form) {
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const requestId = document.getElementById("return-action-request-id").value;
+      const actionType = document.getElementById("return-action-type").value;
+      const pickupDate = document.getElementById("return-action-pickup-date")?.value || "";
+      const note = document.getElementById("return-action-note")?.value.trim() || "";
+      const vendorEmail = (state.currentUser?.email || 'vendor@homerent.ai').trim().toLowerCase();
+
+      try {
+        const res = await fetch(`/api/return-requests/${requestId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-User-Email': vendorEmail,
+            'X-User-Role': 'vendor'
+          },
+          body: JSON.stringify({
+            action: actionType,
+            confirmed_pickup_date: pickupDate,
+            vendor_note: note
+          })
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          showToast(err.error || "Failed to update return request", "error");
+          return;
+        }
+
+        showToast(actionType === "accept" ? "Return request accepted and pickup scheduled!" : "Return request rejected.", "success");
+        closeReturnActionModal();
+        renderAdminReturnRequests();
+      } catch (err) {
+        showToast("Error updating return request", "error");
+      }
+    });
+  }
+}
+
+// ─────────────────────────────────────────────
+// VENDOR CONSOLE: DYNAMIC CATEGORY MANAGEMENT
+// ─────────────────────────────────────────────
+
+let categoryListenersSetup = false;
+
+async function renderAdminCategories() {
+  const tbody = document.getElementById("vendor-categories-tbody");
+  if (!tbody) return;
+
+  tbody.innerHTML = `<tr><td colspan="6" style="padding: 2rem; text-align: center; color: var(--text-secondary);">Loading categories from MongoDB...</td></tr>`;
+
+  try {
+    const res = await fetch('/api/categories');
+    if (!res.ok) throw new Error("Could not fetch categories");
+    const categories = await res.json();
+
+    if (categories.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="6" style="padding: 2rem; text-align: center; color: var(--text-secondary);">No categories found. Click 'Add New Category' above to create one.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = "";
+    categories.forEach(cat => {
+      const tr = document.createElement("tr");
+      tr.style.borderBottom = "1px solid var(--border-color)";
+
+      const isActive = cat.is_active !== false;
+      const statusBadge = isActive
+        ? `<span style="background: rgba(39, 174, 96, 0.15); color: #27ae60; font-weight: 700; padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.74rem;">Active</span>`
+        : `<span style="background: rgba(100, 100, 100, 0.15); color: var(--text-secondary); font-weight: 700; padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.74rem;">Inactive</span>`;
+
+      tr.innerHTML = `
+        <td style="padding: 0.85rem 1rem; font-weight: 600; color: var(--accent-primary);">
+          <span style="font-size: 1.2rem; margin-right: 0.4rem;">${cat.icon || '🏷️'}</span> ${cat.display_name}
+        </td>
+        <td style="padding: 0.85rem 1rem;"><code>${cat.category_name}</code></td>
+        <td style="padding: 0.85rem 1rem; color: var(--text-secondary); font-size: 0.82rem; max-width: 250px;">${cat.description || ''}</td>
+        <td style="padding: 0.85rem 1rem; text-align: center; font-weight: 700;">${cat.appliance_count || 0}</td>
+        <td style="padding: 0.85rem 1rem; text-align: center;">${statusBadge}</td>
+        <td style="padding: 0.85rem 1rem; text-align: right;">
+          <div style="display: inline-flex; gap: 0.4rem; justify-content: flex-end;">
+            <button class="btn-secondary edit-cat-btn" style="padding: 0.35rem 0.65rem; font-size: 0.75rem; border-radius: 6px; cursor: pointer;">Edit</button>
+            <button class="btn-secondary toggle-cat-btn" style="padding: 0.35rem 0.65rem; font-size: 0.75rem; border-radius: 6px; cursor: pointer;">${isActive ? 'Deactivate' : 'Activate'}</button>
+            <button class="btn-primary delete-cat-btn" style="padding: 0.35rem 0.65rem; font-size: 0.75rem; border-radius: 6px; background: #e74c3c; color: white; border: none; cursor: pointer;">Delete</button>
+          </div>
+        </td>
+      `;
+
+      // Edit category
+      tr.querySelector(".edit-cat-btn").addEventListener("click", () => {
+        openCategoryModal("edit", cat);
+      });
+
+      // Toggle Active status
+      tr.querySelector(".toggle-cat-btn").addEventListener("click", async () => {
+        const vendorEmail = (state.currentUser?.email || 'vendor@homerent.ai').trim().toLowerCase();
+        try {
+          const updateRes = await fetch(`/api/categories/${encodeURIComponent(cat.category_name)}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-User-Email': vendorEmail,
+              'X-User-Role': 'vendor'
+            },
+            body: JSON.stringify({ is_active: !isActive })
+          });
+          if (updateRes.ok) {
+            showToast(`Category '${cat.display_name}' status updated!`, "success");
+            await renderDynamicCategoriesUI();
+            renderAdminCategories();
+          } else {
+            const err = await updateRes.json();
+            showToast(err.error || "Failed to update category", "error");
+          }
+        } catch (err) {
+          showToast("Network error updating category", "error");
+        }
+      });
+
+      // Delete category
+      tr.querySelector(".delete-cat-btn").addEventListener("click", async () => {
+        if ((cat.appliance_count || 0) > 0) {
+          showToast(`Cannot delete '${cat.display_name}': ${cat.appliance_count} appliance(s) are assigned to it. Reassign appliances first.`, "warning");
+          return;
+        }
+        if (!confirm(`Are you sure you want to permanently delete category '${cat.display_name}'?`)) return;
+
+        const vendorEmail = (state.currentUser?.email || 'vendor@homerent.ai').trim().toLowerCase();
+        try {
+          const delRes = await fetch(`/api/categories/${encodeURIComponent(cat.category_name)}`, {
+            method: 'DELETE',
+            headers: {
+              'X-User-Email': vendorEmail,
+              'X-User-Role': 'vendor'
+            }
+          });
+          if (delRes.ok) {
+            showToast(`Category '${cat.display_name}' deleted!`, "info");
+            await renderDynamicCategoriesUI();
+            renderAdminCategories();
+          } else {
+            const err = await delRes.json();
+            showToast(err.error || "Failed to delete category", "error");
+          }
+        } catch (err) {
+          showToast("Network error deleting category", "error");
+        }
+      });
+
+      tbody.appendChild(tr);
+    });
+
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="6" style="padding: 2rem; text-align: center; color: #e74c3c;">Error loading categories: ${err.message}</td></tr>`;
+  }
+}
+
+function openCategoryModal(mode = "create", cat = null) {
+  const modal = document.getElementById("category-modal");
+  const titleEl = document.getElementById("category-modal-title");
+  const modeInput = document.getElementById("cat-mode");
+  const idInput = document.getElementById("cat-identifier");
+  const nameInput = document.getElementById("cat-display-name");
+  const iconInput = document.getElementById("cat-icon");
+  const descInput = document.getElementById("cat-description");
+  const activeInput = document.getElementById("cat-is-active");
+
+  if (!modal) return;
+
+  modeInput.value = mode;
+
+  if (mode === "edit" && cat) {
+    titleEl.textContent = `Edit Category: ${cat.display_name}`;
+    idInput.value = cat.category_name;
+    idInput.disabled = true; // slug locked in edit
+    nameInput.value = cat.display_name;
+    iconInput.value = cat.icon || "🏷️";
+    descInput.value = cat.description || "";
+    activeInput.checked = cat.is_active !== false;
+  } else {
+    titleEl.textContent = "Add New Category";
+    idInput.value = "";
+    idInput.disabled = false;
+    nameInput.value = "";
+    iconInput.value = "✨";
+    descInput.value = "";
+    activeInput.checked = true;
+  }
+
+  modal.style.display = "flex";
+}
+
+function closeCategoryModal() {
+  const modal = document.getElementById("category-modal");
+  if (modal) modal.style.display = "none";
+}
+
+function setupCategoryModalListeners() {
+  if (categoryListenersSetup) return;
+  categoryListenersSetup = true;
+
+  const modal = document.getElementById("category-modal");
+  const openBtn = document.getElementById("open-add-category-modal-btn");
+  const closeBtn = document.getElementById("category-modal-close");
+  const cancelBtn = document.getElementById("cat-modal-cancel");
+  const form = document.getElementById("category-form");
+
+  if (openBtn) openBtn.addEventListener("click", () => openCategoryModal("create"));
+  if (closeBtn) closeBtn.addEventListener("click", closeCategoryModal);
+  if (cancelBtn) cancelBtn.addEventListener("click", closeCategoryModal);
+  if (modal) {
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) closeCategoryModal();
+    });
+  }
+
+  if (form) {
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const mode = document.getElementById("cat-mode").value;
+      const slug = document.getElementById("cat-identifier").value.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "");
+      const displayName = document.getElementById("cat-display-name").value.trim();
+      const icon = document.getElementById("cat-icon").value.trim() || "🏷️";
+      const desc = document.getElementById("cat-description").value.trim();
+      const isActive = document.getElementById("cat-is-active").checked;
+      const vendorEmail = (state.currentUser?.email || 'vendor@homerent.ai').trim().toLowerCase();
+
+      if (!slug || !displayName) {
+        showToast("Please provide category slug and display name", "warning");
+        return;
+      }
+
+      try {
+        let res;
+        if (mode === "create") {
+          res = await fetch('/api/categories', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-User-Email': vendorEmail,
+              'X-User-Role': 'vendor'
+            },
+            body: JSON.stringify({
+              category_name: slug,
+              display_name: displayName,
+              icon: icon,
+              description: desc,
+              is_active: isActive
+            })
+          });
+        } else {
+          res = await fetch(`/api/categories/${encodeURIComponent(slug)}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-User-Email': vendorEmail,
+              'X-User-Role': 'vendor'
+            },
+            body: JSON.stringify({
+              display_name: displayName,
+              icon: icon,
+              description: desc,
+              is_active: isActive
+            })
+          });
+        }
+
+        if (!res.ok) {
+          const err = await res.json();
+          showToast(err.error || "Failed to save category", "error");
+          return;
+        }
+
+        showToast(`Category '${displayName}' saved successfully!`, "success");
+        closeCategoryModal();
+        await renderDynamicCategoriesUI();
+        renderAdminCategories();
+      } catch (err) {
+        showToast("Network error saving category", "error");
+      }
+    });
+  }
+}
+
+// ─────────────────────────────────────────────
+// VENDOR CONSOLE: LSTM DEMAND FORECASTING MODULE
+// ─────────────────────────────────────────────
+
+let forecastInitialized = false;
+
+async function initForecastConsole() {
+  if (!elements.adminForecastSection) return;
+
+  // Setup event listeners once
+  if (!forecastInitialized) {
+    if (elements.forecastRunBtn) {
+      elements.forecastRunBtn.addEventListener("click", () => runDemandForecast(false));
+    }
+    if (elements.forecastRetrainBtn) {
+      elements.forecastRetrainBtn.addEventListener("click", () => runDemandForecast(true));
+    }
+    if (elements.forecastScopeSelect) {
+      elements.forecastScopeSelect.addEventListener("change", () => runDemandForecast(false));
+    }
+    if (elements.forecastHorizonSelect) {
+      elements.forecastHorizonSelect.addEventListener("change", () => runDemandForecast(false));
+    }
+    if (elements.forecastIntervalSelect) {
+      elements.forecastIntervalSelect.addEventListener("change", () => runDemandForecast(false));
+    }
+    forecastInitialized = true;
+  }
+
+  // Load vendor appliances & category counts dynamically from MongoDB
+  await loadForecastAppliancesList();
+
+  // Run initial forecast
+  runDemandForecast(false);
+}
+
+async function loadForecastAppliancesList() {
+  if (!elements.forecastApplianceGroup) return;
+
+  const vendorEmail = (state.currentUser && state.currentUser.email) || "vendor@homerent.ai";
+  try {
+    const res = await fetch(`/api/vendor/forecast-appliances?email=${encodeURIComponent(vendorEmail)}`, {
+      headers: {
+        "X-User-Email": vendorEmail,
+        "X-User-Role": "vendor"
+      }
+    });
+    if (!res.ok) return;
+    const contentType = res.headers.get("content-type") || "";
+    if (!contentType.includes("application/json")) return;
+    const data = await res.json();
+    if (!data.success) return;
+
+    // Update Category group labels with real DB booking counts
+    if (elements.forecastCategoryGroup && data.category_counts) {
+      const cats = {
+        kitchen: "Kitchen Category",
+        laundry: "Laundry Category",
+        climate: "Climate Control Category",
+        living: "Smart Living Category"
+      };
+      elements.forecastCategoryGroup.innerHTML = Object.entries(cats).map(([catKey, label]) => {
+        const count = data.category_counts[catKey] || 0;
+        return `<option value="cat:${catKey}">${label} (${count} real bookings in DB)</option>`;
+      }).join("");
+    }
+
+    // Populate individual appliances group
+    if (data.appliances && data.appliances.length > 0) {
+      elements.forecastApplianceGroup.innerHTML = data.appliances.map(app => {
+        return `<option value="${app.id}">${app.title} (${app.bookings_count} bookings in DB)</option>`;
+      }).join("");
+    } else {
+      elements.forecastApplianceGroup.innerHTML = `<option disabled>No fleet appliances registered</option>`;
+    }
+
+  } catch (err) {
+    console.warn("Could not load vendor forecast appliances:", err);
+  }
+}
+
+async function runDemandForecast(forceRetrain = false) {
+  if (!elements.forecastStatusContainer) return;
+
+  const vendorEmail = (state.currentUser && state.currentUser.email) || "vendor@homerent.ai";
+  const scopeVal = elements.forecastScopeSelect ? elements.forecastScopeSelect.value : "all";
+  const horizonVal = elements.forecastHorizonSelect ? parseInt(elements.forecastHorizonSelect.value) : 14;
+  const intervalVal = elements.forecastIntervalSelect ? elements.forecastIntervalSelect.value : "daily";
+
+  let applianceId = null;
+  let category = null;
+
+  if (scopeVal.startsWith("cat:")) {
+    category = scopeVal.replace("cat:", "");
+  } else if (scopeVal !== "all" && !isNaN(Number(scopeVal))) {
+    applianceId = Number(scopeVal);
+  }
+
+  // Display Loader
+  elements.forecastStatusContainer.style.display = "block";
+  elements.forecastStatusContainer.innerHTML = `
+    <div style="padding: 1rem 1.25rem; background: rgba(37, 99, 235, 0.08); border: 1px solid rgba(37, 99, 235, 0.3); border-radius: 12px; display: flex; align-items: center; gap: 0.85rem; color: #1e40af;">
+      <div style="width: 20px; height: 20px; border: 2.5px solid #93c5fd; border-top-color: #2563eb; border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
+      <div>
+        <div style="font-weight: 700; font-size: 0.9rem;">${forceRetrain ? "Re-training LSTM Deep Learning Model..." : "Computing LSTM Demand Forecast from MongoDB Records..."}</div>
+        <div style="font-size: 0.78rem; opacity: 0.85;">Retrieving real historical records & performing chronological sequence training without data fabrication.</div>
+      </div>
+    </div>
+  `;
+
+  if (elements.forecastRunBtn) elements.forecastRunBtn.disabled = true;
+  if (elements.forecastRetrainBtn) elements.forecastRetrainBtn.disabled = true;
+
+  try {
+    const res = await fetch("/api/vendor/demand-forecast", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-User-Email": vendorEmail,
+        "X-User-Role": "vendor"
+      },
+      body: JSON.stringify({
+        vendor_email: vendorEmail,
+        appliance_id: applianceId,
+        category: category,
+        horizon: horizonVal,
+        interval: intervalVal,
+        force_retrain: forceRetrain
+      })
+    });
+
+    const contentType = res.headers.get("content-type") || "";
+    let data;
+    if (contentType.includes("application/json")) {
+      data = await res.json();
+    } else {
+      const errText = await res.text();
+      throw new Error(`Server returned HTTP ${res.status} (${res.statusText || "Error"}). Please ensure backend server is active.`);
+    }
+
+    if (!res.ok) {
+      throw new Error(data.error || data.message || `Server error (HTTP ${res.status})`);
+    }
+
+    if (data.status === "insufficient_data") {
+      // Diagnostic message - Zero mock data
+      elements.forecastStatusContainer.innerHTML = `
+        <div style="padding: 1.15rem 1.35rem; background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 12px; color: #991b1b;">
+          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.4rem;">
+            <div style="font-weight: 700; font-size: 0.95rem; display: flex; align-items: center; gap: 0.5rem;">
+              <span>⚠️ Insufficient Historical Booking Data</span>
+            </div>
+            <span style="font-size: 0.72rem; font-weight: 700; background: #fee2e2; color: #991b1b; padding: 0.2rem 0.6rem; border-radius: 6px; letter-spacing: 0.4px;">
+              ZERO SYNTHETIC DATA ENFORCED
+            </span>
+          </div>
+          <div style="font-size: 0.88rem; line-height: 1.5; margin-bottom: 0.5rem;">${data.message}</div>
+          <div style="font-size: 0.78rem; opacity: 0.9; background: rgba(239, 68, 68, 0.05); padding: 0.5rem 0.75rem; border-radius: 8px;">
+            <strong>Data Diagnostics:</strong> Found ${data.total_bookings ?? 0} bookings across ${data.timeline_points ?? 0} timeline points. LSTM sequence construction requires at least ${data.required_minimum ?? 6} points.
+            To generate predictions, select a scope with more historical records (such as <em>Entire Fleet</em>).
+          </div>
+        </div>
+      `;
+
+      // Update metrics with honest diagnostics
+      if (elements.metricRecordsCount) elements.metricRecordsCount.textContent = data.total_bookings ?? 0;
+      if (elements.metricTimelineSpan) elements.metricTimelineSpan.textContent = "Insufficient for LSTM window";
+      if (elements.metricMae) elements.metricMae.textContent = "N/A";
+      if (elements.metricRmse) elements.metricRmse.textContent = "N/A";
+      if (elements.metricSeasonalityBadge) elements.metricSeasonalityBadge.textContent = "Insufficient Data";
+      if (elements.metricSeasonalityDesc) elements.metricSeasonalityDesc.textContent = "Cannot evaluate seasonality without records";
+
+      // Render diagnostic placeholder in chart
+      if (elements.forecastChartContainer) {
+        elements.forecastChartContainer.innerHTML = `
+          <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 280px; text-align: center; color: var(--text-secondary); padding: 2rem;">
+            <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">📊</div>
+            <h5 style="font-size: 1.1rem; color: var(--accent-primary); margin: 0 0 0.5rem 0;">No Substitute or Fake Demand Forecast Generated</h5>
+            <p style="max-width: 500px; font-size: 0.86rem; line-height: 1.5; margin: 0;">
+              In accordance with strict data integrity requirements, the system will not invent artificial demand numbers when MongoDB data is insufficient.
+              Please choose a broader scope (e.g. <strong>Entire Fleet</strong>) to train on existing bookings.
+            </p>
+          </div>
+        `;
+      }
+
+      // Clear table
+      if (elements.forecastTableBody) {
+        elements.forecastTableBody.innerHTML = `
+          <tr>
+            <td colspan="5" style="padding: 1.5rem; text-align: center; color: #991b1b; font-size: 0.88rem;">
+              Forecast unavailable: real MongoDB bookings for this target are below the minimum sequence threshold.
+            </td>
+          </tr>
+        `;
+      }
+      if (elements.forecastTotalPill) elements.forecastTotalPill.textContent = "Total Projected Demand: 0 units";
+
+      return;
+    }
+
+    if (data.status === "success") {
+      // Success Banner
+      elements.forecastStatusContainer.innerHTML = `
+        <div style="padding: 0.85rem 1.25rem; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 12px; color: #065f46; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+          <div style="font-weight: 600; font-size: 0.88rem; display: flex; align-items: center; gap: 0.45rem;">
+            <span style="font-size: 1.1rem;">✓</span>
+            <span>LSTM Model successfully trained on ${data.total_bookings} verified MongoDB booking transactions (${data.train_samples} train / ${data.test_samples} test sequences).</span>
+          </div>
+          <span style="font-size: 0.74rem; background: #d1fae5; color: #065f46; padding: 0.25rem 0.65rem; border-radius: 6px; font-weight: 700;">
+            ${data.is_cached ? "⚡ Serving Cached Model Weights" : "🔄 Freshly Trained on MongoDB"}
+          </span>
+        </div>
+      `;
+
+      // Update Metrics Cards
+      if (elements.metricRecordsCount) elements.metricRecordsCount.textContent = data.total_bookings;
+      if (elements.metricTimelineSpan) elements.metricTimelineSpan.textContent = `${data.historical_demand.length} ${data.interval} chronological points`;
+      if (elements.metricMae) elements.metricMae.textContent = data.metrics.mae !== null ? data.metrics.mae : "N/A";
+      if (elements.metricRmse) elements.metricRmse.textContent = data.metrics.rmse !== null ? data.metrics.rmse : "N/A";
+      if (elements.metricSeasonalityBadge) {
+        elements.metricSeasonalityBadge.textContent = data.seasonality.status === "limited_history" ? "Limited (< 1 Year)" : "Seasonal Patterns Detected";
+      }
+      if (elements.metricSeasonalityDesc) elements.metricSeasonalityDesc.textContent = data.seasonality.message;
+
+      // Render Chart and Table
+      renderForecastChart(data);
+      renderForecastTable(data);
+    }
+
+  } catch (err) {
+    console.error("Demand forecast failed:", err);
+    elements.forecastStatusContainer.innerHTML = `
+      <div style="padding: 1rem; background: rgba(239, 68, 68, 0.08); border: 1px solid #ef4444; border-radius: 12px; color: #991b1b; font-size: 0.88rem;">
+        An unexpected error occurred while communicating with the forecasting backend: ${err.message}
+      </div>
+    `;
+  } finally {
+    if (elements.forecastRunBtn) elements.forecastRunBtn.disabled = false;
+    if (elements.forecastRetrainBtn) elements.forecastRetrainBtn.disabled = false;
+  }
+}
+
+function renderForecastChart(data) {
+  if (!elements.forecastChartContainer) return;
+
+  const histDemand = data.historical_demand || [];
+  const histDates = data.historical_dates || [];
+  const fcDemand = data.forecast_demand || [];
+  const fcDates = data.forecast_dates || [];
+
+  const nHist = histDemand.length;
+  const nFc = fcDemand.length;
+  const nTotal = nHist + nFc;
+
+  if (nTotal < 2) {
+    elements.forecastChartContainer.innerHTML = `<div style="text-align: center; padding: 2rem; color: var(--text-secondary);">Insufficient data points to render curve.</div>`;
+    return;
+  }
+
+  // Dimensions
+  const svgWidth = 840;
+  const svgHeight = 320;
+  const padLeft = 45;
+  const padRight = 35;
+  const padTop = 30;
+  const padBottom = 45;
+
+  const chartW = svgWidth - padLeft - padRight;
+  const chartH = svgHeight - padTop - padBottom;
+
+  const allVals = [...histDemand, ...fcDemand];
+  const maxVal = Math.max(...allVals, 1) * 1.25;
+
+  const getX = (idx) => padLeft + (idx / (nTotal - 1)) * chartW;
+  const getY = (val) => padTop + chartH - (val / maxVal) * chartH;
+
+  // Grid lines (0%, 25%, 50%, 75%, 100%)
+  const yTicks = [0, maxVal * 0.25, maxVal * 0.5, maxVal * 0.75, maxVal];
+  let gridSvg = "";
+  yTicks.forEach(tick => {
+    const yPos = getY(tick);
+    gridSvg += `
+      <line x1="${padLeft}" y1="${yPos}" x2="${svgWidth - padRight}" y2="${yPos}" stroke="currentColor" stroke-opacity="0.1" stroke-dasharray="3,3" />
+      <text x="${padLeft - 8}" y="${yPos + 4}" font-size="10" fill="currentColor" opacity="0.6" text-anchor="end">${Math.round(tick * 10) / 10}</text>
+    `;
+  });
+
+  // Historical path & area
+  let histPoints = "";
+  let histArea = `M ${padLeft} ${padTop + chartH}`;
+  histDemand.forEach((v, i) => {
+    const x = getX(i);
+    const y = getY(v);
+    if (i === 0) {
+      histPoints += `M ${x} ${y}`;
+    } else {
+      histPoints += ` L ${x} ${y}`;
+    }
+    histArea += ` L ${x} ${y}`;
+  });
+  histArea += ` L ${getX(nHist - 1)} ${padTop + chartH} Z`;
+
+  // Boundary X
+  const boundaryX = getX(nHist - 1);
+
+  // Forecast path & area
+  // Starts from the last historical point for continuity
+  const lastHistX = getX(nHist - 1);
+  const lastHistY = getY(histDemand[nHist - 1]);
+
+  let fcPoints = `M ${lastHistX} ${lastHistY}`;
+  let fcArea = `M ${lastHistX} ${padTop + chartH} L ${lastHistX} ${lastHistY}`;
+
+  fcDemand.forEach((v, i) => {
+    const x = getX(nHist + i);
+    const y = getY(v);
+    fcPoints += ` L ${x} ${y}`;
+    fcArea += ` L ${x} ${y}`;
+  });
+  fcArea += ` L ${getX(nTotal - 1)} ${padTop + chartH} Z`;
+
+  // Data point markers for non-zero historical points and forecast points
+  let circlesSvg = "";
+  histDemand.forEach((v, i) => {
+    if (v > 0) {
+      const x = getX(i);
+      const y = getY(v);
+      circlesSvg += `
+        <circle cx="${x}" cy="${y}" r="4" fill="#2563eb" stroke="#ffffff" stroke-width="2">
+          <title>Historical: ${v} units (${histDates[i]})</title>
+        </circle>
+      `;
+    }
+  });
+
+  fcDemand.forEach((v, i) => {
+    const x = getX(nHist + i);
+    const y = getY(v);
+    circlesSvg += `
+      <circle cx="${x}" cy="${y}" r="4" fill="#f59e0b" stroke="#ffffff" stroke-width="2">
+        <title>Predicted: ${v} units (${fcDates[i]})</title>
+      </circle>
+    `;
+  });
+
+  // Date labels along X axis
+  const firstHistDate = histDates[0] || "";
+  const boundaryDate = histDates[nHist - 1] || "";
+  const lastFcDate = fcDates[nFc - 1] || "";
+
+  const xLabelsSvg = `
+    <text x="${padLeft}" y="${svgHeight - 15}" font-size="10" fill="currentColor" opacity="0.7" text-anchor="start">Start: ${firstHistDate}</text>
+    <text x="${boundaryX}" y="${svgHeight - 15}" font-size="10" fill="#dc2626" font-weight="700" text-anchor="middle">Today: ${boundaryDate}</text>
+    <text x="${svgWidth - padRight}" y="${svgHeight - 15}" font-size="10" fill="#f59e0b" font-weight="700" text-anchor="end">Horizon: ${lastFcDate}</text>
+  `;
+
+  elements.forecastChartContainer.innerHTML = `
+    <svg viewBox="0 0 ${svgWidth} ${svgHeight}" style="width: 100%; height: auto; font-family: inherit; overflow: visible;">
+      <defs>
+        <linearGradient id="histGradient" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#2563eb" stop-opacity="0.3" />
+          <stop offset="100%" stop-color="#2563eb" stop-opacity="0.0" />
+        </linearGradient>
+        <linearGradient id="fcGradient" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.35" />
+          <stop offset="100%" stop-color="#f59e0b" stop-opacity="0.0" />
+        </linearGradient>
+      </defs>
+
+      <!-- Grid -->
+      ${gridSvg}
+
+      <!-- Historical Fill Area -->
+      <path d="${histArea}" fill="url(#histGradient)" />
+
+      <!-- Forecast Fill Area -->
+      <path d="${fcArea}" fill="url(#fcGradient)" />
+
+      <!-- Boundary Line -->
+      <line x1="${boundaryX}" y1="${padTop - 8}" x2="${boundaryX}" y2="${padTop + chartH}" stroke="#dc2626" stroke-width="1.8" stroke-dasharray="4,3" />
+      <text x="${boundaryX}" y="${padTop - 12}" fill="#dc2626" font-size="9.5" font-weight="700" text-anchor="middle" letter-spacing="0.4px">FORECAST BOUNDARY</text>
+
+      <!-- Historical Line -->
+      <path d="${histPoints}" fill="none" stroke="#2563eb" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+
+      <!-- Forecast Line (Dashed) -->
+      <path d="${fcPoints}" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-dasharray="5,3" stroke-linecap="round" stroke-linejoin="round" />
+
+      <!-- Data Nodes -->
+      ${circlesSvg}
+
+      <!-- X-Axis Labels -->
+      ${xLabelsSvg}
+    </svg>
+  `;
+}
+
+function renderForecastTable(data) {
+  if (!elements.forecastTableBody) return;
+
+  const fcDemand = data.forecast_demand || [];
+  const fcDates = data.forecast_dates || [];
+
+  if (fcDemand.length === 0) {
+    elements.forecastTableBody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 1.5rem; color: var(--text-secondary);">No forecast points available.</td></tr>`;
+    return;
+  }
+
+  const totalDemand = Math.round(fcDemand.reduce((acc, v) => acc + v, 0) * 10) / 10;
+  if (elements.forecastTotalPill) {
+    elements.forecastTotalPill.textContent = `Total Projected Demand: ${totalDemand} units`;
+  }
+
+  elements.forecastTableBody.innerHTML = fcDemand.map((units, idx) => {
+    const dateStr = fcDates[idx] || `Step +${idx + 1}`;
+    
+    // Intensity badge
+    let intensityBadge = `<span style="background: rgba(16,185,129,0.1); color: #059669; padding: 0.2rem 0.6rem; border-radius: 6px; font-weight: 700; font-size: 0.75rem;">Moderate / Normal</span>`;
+    if (units >= 3) {
+      intensityBadge = `<span style="background: rgba(239,68,68,0.1); color: #dc2626; padding: 0.2rem 0.6rem; border-radius: 6px; font-weight: 700; font-size: 0.75rem;">High Demand Peak</span>`;
+    } else if (units >= 1) {
+      intensityBadge = `<span style="background: rgba(245,158,11,0.1); color: #d97706; padding: 0.2rem 0.6rem; border-radius: 6px; font-weight: 700; font-size: 0.75rem;">Elevated Demand</span>`;
+    }
+
+    // Readiness suggestion
+    let readinessText = "Standard Fleet Buffer Adequate";
+    if (units >= 2) {
+      readinessText = "Prepare 2+ Units for Inspection & Dispatch";
+    }
+
+    return `
+      <tr style="border-bottom: 1px solid var(--border-color);">
+        <td style="padding: 0.85rem 1rem; font-weight: 600; color: var(--accent-primary);">${dateStr}</td>
+        <td style="padding: 0.85rem 1rem; color: var(--text-secondary);">Day +${idx + 1}</td>
+        <td style="padding: 0.85rem 1rem; font-weight: 700; font-size: 0.95rem;">${units} <span style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 400;">units</span></td>
+        <td style="padding: 0.85rem 1rem;">${intensityBadge}</td>
+        <td style="padding: 0.85rem 1rem; font-size: 0.8rem; color: var(--text-secondary);">${readinessText}</td>
+      </tr>
+    `;
+  }).join("");
 }
 
 // --- AI CHATBOT / RECOMMENDATION LOGIC ---
@@ -2788,6 +4058,19 @@ function setupEventListeners() {
 
   setupCreditCardListeners();
   setupReviewSystemListeners();
+  setupReturnActionModalListeners();
+  setupCategoryModalListeners();
+
+  // Payment Method Selection listeners (Card, UPI Instant, Pay on Delivery)
+  document.querySelectorAll('.payment-method-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const radio = card.querySelector('input[name="pay-method"]');
+      if (radio) {
+        radio.checked = true;
+        window.switchPayMethod(radio.value);
+      }
+    });
+  });
 
   // Close checkout success handler
   elements.checkoutClose.addEventListener("click", () => {
@@ -2939,7 +4222,8 @@ async function handleAuthSubmit(e) {
         body: JSON.stringify({ action: 'login', email, password, role })
       });
       if (!res.ok) {
-        elements.authErrorMsg.textContent = "Invalid email, password, or role. Please try again.";
+        const errJson = await res.json().catch(() => ({}));
+        elements.authErrorMsg.textContent = errJson.error || `Invalid credentials for ${role} role. Please check your email and password.`;
         elements.authErrorMsg.style.display = "block";
         return;
       }
@@ -2975,7 +4259,14 @@ async function handleAuthSubmit(e) {
         body: JSON.stringify({ action: 'register', name, email, password, role })
       });
       if (res.status === 409) {
-        elements.authErrorMsg.textContent = "An account with this email already exists. Please sign in.";
+        const errJson = await res.json().catch(() => ({}));
+        elements.authErrorMsg.textContent = errJson.error || `A ${role} account with this email already exists. Please sign in.`;
+        elements.authErrorMsg.style.display = "block";
+        return;
+      }
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        elements.authErrorMsg.textContent = errJson.error || "Registration failed. Please try again.";
         elements.authErrorMsg.style.display = "block";
         return;
       }
